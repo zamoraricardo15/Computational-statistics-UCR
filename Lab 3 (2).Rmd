@@ -1,0 +1,1223 @@
+---
+title: "Laboratorio 3"
+author: "Grupo 1: Jesús Guzmán, M del Carmen Carranza, Oscar Agüero, Ricardo Zamora"
+date: "Fecha de entrega: 26/05/2021"
+output: html_document
+---
+# Instrucciones generales {.tabset .tabset-fade}
+
+```{r, cache = TRUE}
+library(dplyr)
+library(tidyverse)
+```
+
+
+Genere un R Markdown en donde se muestre el código utilizado y la salida de este.
+
+En este ejercicio vamos a generar un dataset aleatorio de acuerdo con el modelo 
+$Yi=m(xi)+ϵi,i=1,…,101, $
+
+$m(x)=x+4cos(7x)$
+
+$ϵ1,…,ϵ101 iid N(0,1)$. En las partes 1, 2 y 3 utilizaremos el mismo diseño equidistante para xi, mientras que 4 utilizaremos un diseño aleatorio. 
+
+Nota: fije una semilla para asegurar reproductibilidad de los resultados, e.g. set.seed(1).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  fig.align = 'center',
+  fig.retina = 2,
+  fig.width = 8,
+  out.width = '100%',
+  fig.asp = 0.63
+  )
+
+```
+
+## PREGUNTA 1
+
+```{r, cache = TRUE}
+set.seed(1)
+mx=function(x){
+  x+4*cos(7*x)
+}
+ei=matrix(rnorm((101*1000),0,1), nrow=101, ncol=1000)
+xi=seq(from=-1, to=1, length=101)
+
+yi=mx(xi)+ei
+
+yv=mx(xi)
+
+```
+
+### Modelo Nayadara-Watson
+
+```{r, cache = TRUE}
+library(stats)
+modelo<-matrix(NA, nrow=101, ncol=1000)
+for (i in 1:1000) {
+  mod=ksmooth(x=xi, y=yi[,i], bandwidth = 0.2)
+  modelo[,i]<-mod$y
+}
+
+```
+
+**Para el cálculo de los grados de libertad**
+```{r, cache = TRUE}
+n<-length(yv)
+x<-xi
+S<-matrix(NA, nrow = n, ncol=n)
+colnames(S)<- 1:n
+In<-diag(n)
+h=0.2
+
+for (j in 1:n){
+  krs<-ksmooth(x=x,
+               y=In[,j],
+               kernel = "normal",
+               bandwidth = h,
+               x.points = x)
+  S[,j]<-krs$y
+}
+
+sum(diag(S))
+
+```
+
+
+### Modelo Regresión local polinomial
+
+Ajustar el span
+
+```{r, cache = TRUE}
+
+#Para seleccionar el span. Trabajamos únicamente con una configuración (yi[,1])
+
+h=c(0.1,0.2,0.3,0.4,.5,.6,.7,.8,.9,1)
+df<-rep(0, length(h))
+for (i in 1:length(h)){
+  mod<-loess(yi[,1]~xi, span=h[i])
+  df[i]<-mod$enp
+}
+df
+
+```
+El valor más cercano a 11.33 se da entre el span igual a 0.2 y 0.3., estando más cercano a 0.3. Por ende, utilizaremos 0.258
+
+```{r, cache = TRUE}
+modelo1<-matrix(NA, nrow=101, ncol=1000)
+for (i in 1:1000) {
+  mod1<-loess(yi[,i]~xi, span = 0.258)
+  modelo1[,i]<-mod1$fitted
+}
+```
+
+
+
+### Modelo de splines de suavizado
+
+Se usan los grados de libertad igual a 11.33
+
+```{r, cache = TRUE}
+modelo2<-matrix(NA, nrow=101, ncol=1000)
+for (i in 1:1000) {
+  mod2<-smooth.spline(yi[,i]~xi, , df=11.33)
+  modelo2[,i]<-(predict(mod2, xi)$y)
+}
+```
+
+
+### Pregunta B
+
+Para cada punto xi, calcule
+
+1. el sesgo empírico de m(xi) (promedio a lo largo de todas las simulaciones menos el valor verdadero m(x)),
+
+**Modelo Nayadara-Watson**
+
+```{r, cache = TRUE}
+SE1.MAT<-yv-modelo
+SE1<-rep(NA, 101)
+for (i in 1:101){
+  SE1[i]<-mean(SE1.MAT[i,])
+}
+
+```
+
+**Modelo de regresión local polinomial**
+
+```{r, cache = TRUE}
+SE2.MAT<-yv-modelo1
+SE2<-rep(NA, 101)
+for (i in 1:101){
+  SE2[i]<-mean(SE2.MAT[i,])
+}
+SE2
+```
+
+**Modelo de splines de suavizado**
+
+```{r, cache = TRUE}
+yv-modelo2[,1]
+SE3.MAT<-yv-modelo2
+SE3<-rep(NA, 101)
+for (i in 1:101){
+  SE3[i]<-mean(SE3.MAT[i,])
+}
+SE3
+```
+
+
+2. La varianza de m^(xi)
+
+**Modelo Nayadara-Watson**
+
+```{r, cache = TRUE}
+variancia1<-rep(0, 101)
+for (i in 1:101){
+  variancia1[i]<-var(modelo[i,])
+}
+
+```
+
+
+**Modelo de regresión local polinomial**
+
+```{r, cache = TRUE}
+variancia2<-rep(0, 101)
+for (i in 1:101){
+  variancia2[i]<-var(modelo1[i,])
+}
+
+```
+
+
+
+**Modelo de splines de suavizado**
+
+```{r, cache = TRUE}
+variancia3<-rep(0, 101)
+for (i in 1:101){
+  variancia3[i]<-var(modelo2[i,])
+}
+
+
+```
+
+
+
+```{r, cache = TRUE}
+RE1<-SE1.MAT^2
+MSE1<-rep (0, 101)
+for (i in 1:101){
+MSE1[i]<-(sum(RE1[,i])/101)  
+}
+
+RE2<-SE2.MAT^2
+MSE2<-rep (0, 101)
+for (i in 1:101){
+MSE2[i]<-(sum(RE2[,i])/101)  
+}
+
+RE3<-SE3.MAT^2
+MSE3<-rep (0, 101)
+for (i in 1:101){
+MSE3[i]<-(sum(RE3[,i])/101)  
+}
+
+
+```
+
+
+### Pregunta C
+
+ Grafique estas tres cantidades contra xi para los estimadores.
+ 
+ **Modelo Nayadara-Watson**
+ 
+```{r, cache = TRUE}
+library (ggplot2)
+NW<-cbind(variancia1, SE1, MSE1, xi)
+NW<-tibble::tibble(NW)
+
+graf1<-ggplot (NW) + geom_point(aes(x=xi, y=SE1))+geom_point(x=xi, y=variancia1, col="red")+geom_point(x=xi, y=MSE1, col="blue")+theme_bw()
+graf1
+
+```
+ 
+**Modelo de regresión local polinomial**
+
+```{r, cache = TRUE}
+RLP<-cbind(variancia2, SE2, MSE2, xi)
+RLP<-tibble::tibble(RLP)
+
+graf2<-ggplot (RLP) + geom_point(aes(x=xi, y=MSE2))+geom_point(x=xi, y=variancia2, col="red")+geom_point(x=xi, y=SE2, col="blue")+theme_bw()
+graf2
+
+```
+
+
+**Modelo de splines de suavizado**
+
+```{r, cache = TRUE}
+
+MSS<-cbind(variancia3, SE3, MSE3, xi)
+MSS<-tibble::tibble(MSS)
+
+graf1<-ggplot (MSS) + geom_point(aes(x=xi, y=SE3))+geom_point(x=xi, y=variancia3, col="red")+geom_point(x=xi, y=MSE3, col="blue")+theme_bw()
+graf1
+
+```
+
+### Pregunta D
+
+¿Cuál es la conexión entre el sesgo y la curvatura $m^{\prime\prime}(x)$? 
+
+Si se observa el sesgo de los tres modelos, se logra visualizar como en los tres modelos el sesgo sigue la misma trayectoria que la curvatura original. En el modelo de regresión local es menos clara pues el sesgo presenta mayor dispersión, sin embargo tambien tiene un comportamiento similar.
+
+### Pregunta E
+
+¿Cómo se comporta el sesgo en los bordes?
+
+En los bordes el sesgo se crece de sobremanera en negativo, y se aleja de la curvatura y del promedio de las tres mediciones. De igual manera, en el modelo polinomial este comportamiento es menos fuerte.
+
+
+## PREGUNTA 2
+
+**A.** Calcule el correspondiente estimado de error estándar para cada una de las 1000 simulaciones, los 101 $x_i$ y los tres estimadores de regresión estudiados según la fórmula:
+
+$$
+\hat{\text{se}}\left(\hat{m}(x_i)\right) = \sqrt{ \hat{\mathbb{V}\text{ar}}\left(\hat{m}(x_i)\right)} = \hat{\sigma}_{\epsilon} \sqrt{\left(\mathcal{S} \mathcal{S}^{\intercal} \right)_{ii}}
+$$
+
+Para estimar *manualmente* el error estándar necesitamos las correspondientes matrices de suavizado (o *hat matrices*) $\mathcal{S}$. Recuerden que las matrices $\mathcal{S}$ dependen únicamente de los puntos de diseño $x_i$ y, por ende, no deben ser calculadas para cada simulación (mas sí para cada método de regresión).
+
+```{r, cache = TRUE}
+library(tidyverse)
+```
+
+
+```{r, cache = TRUE, message=FALSE, warning=FALSE}
+
+set.seed(1)
+xi=seq(from=-1, to=1, length=101)
+mx=function(x){
+  x+4*cos(7*x)
+}
+
+# replicando los valores pero en una lista
+yi <- vector("list", 1000)
+
+for(i in 1:1000){
+  yi[[i]] <-  mx(xi) + rnorm(101, 0, 1)
+}
+
+nad_res <- yi %>%
+  map(~{ksmooth(x = xi, y = .x, kernel = 'normal', bandwidth = 0.2) %>%
+      pluck("y")})
+
+pol_res <- yi %>%
+  map(function(y){
+      res <- loess(y ~ xi, span = 0.258)
+      return(list(
+        fitted = res$fitted,
+        resid = res$residuals
+      ))
+  })
+
+# Replico la Matriz S para no tener NA's
+
+n <- length(xi)
+x <- xi
+S <- matrix(NA, nrow = n, ncol=n)
+colnames(S) <- 1:n
+In <- diag(n)
+h <- 0.2
+
+for (j in 1:n){
+  krs<-ksmooth(x=x,
+               y=In[,j],
+               kernel = "normal",
+               bandwidth = h,
+               x.points = x)
+  S[,j]<-krs$y
+}
+
+
+spl_res <- yi %>%
+  map(function(y){
+      res <- smooth.spline(xi, y, df = sum(diag(S)))
+      return(list(
+        fitted = res$y,
+        lambda = res$lambda
+      ))
+  })
+
+
+# Para KS
+se_ks <- vector("list", length(x))
+raiz_S <- sqrt(S%*%t(S))
+
+for(j in 1:1000){
+  wi <- nad_res[[j]]
+  sigma_2 <- sum((wi - yi[[j]])^2)/(length(wi)-sum(diag(S)))
+  se_ks[[j]] <- sqrt(sigma_2)*diag(raiz_S)
+  
+}
+
+
+# Para Loess
+se_ls <- vector("list", length(x))
+raiz_S <- sqrt(modelo1%*%t(modelo1))
+
+for(j in 1:1000){
+  wi <- pol_res[[j]]$fitted
+  sigma_2 <- sum((wi - yi[[j]])^2)/(length(wi)-sum(diag(modelo1)))
+  se_ls[[j]] <- sqrt(sigma_2)*diag(raiz_S)
+  
+}
+
+# Para Splines
+se_sp <- vector("list", length(x))
+raiz_S <- sqrt(modelo2%*%t(modelo2))
+
+for(j in 1:1000){
+  wi <- spl_res[[j]]$fitted
+  sigma_2 <- sum((wi-yi[[j]])^2)/(length(wi)-sum(diag(modelo2)))
+  se_sp[[j]] <- sqrt(sigma_2)*diag(raiz_S)
+  
+}
+
+```
+
+**B.** Calcule los intervalos de confianza *locales* (*piecewise*) al 95% para los tres métodos estudiados según 
+
+$$I = \hat{m}(x_i) \pm 1.96 \cdot \hat{\text{se}}\left(\hat{m}(x_i)\right)$$
+
+```{r, cache = TRUE}
+# inserte acá su código
+
+## Para KS
+
+ic_ks <- vector("list", length(x))
+for(j in 1:1000){
+  yi <- nad_res[[j]]
+  ic_ks[[j]] <- list()
+  ic_ks[[j]]$ICI <- yi - 1.96*se_ks[[j]]
+  ic_ks[[j]]$ICS <- yi + 1.96*se_ks[[j]]
+}
+
+## Para Loess
+ic_ls <- vector("list", length(x))
+for(j in 1:1000){
+  yi <- pol_res[[j]]$fitted
+  ic_ls[[j]] <- list()
+  ic_ls[[j]]$ICI <- yi - 1.96*se_ls[[j]]
+  ic_ls[[j]]$ICS <- yi + 1.96*se_ls[[j]]
+}
+
+## Para Splines
+
+ic_sp <- vector("list", length(x))
+for(j in 1:1000){
+  yi <- spl_res[[j]]$fitted
+  ic_sp[[j]] <- list()
+  ic_sp[[j]]$ICI <- yi - 1.96*se_sp[[j]]
+  ic_sp[[j]]$ICS <- yi + 1.96*se_sp[[j]]
+}
+
+```
+
+**C.** ¿Qué porcentaje de veces el intervalo de confianza *local* contiene el valor verdadero $m(0.5)$ para cada uno de los métodos estudiados?
+
+En los modelos de regresion polinomial y de splines se obtienen valores dentro de los intervalos de confianza, en otras palabras el 100% de los intervalos de confianza *local* contiene el valor verdadero de $m(0.5)$, para cada uno de estos dos modelos, no así en el caso del modelo de Nadayara Watson.
+
+
+```{r, cache = TRUE}
+# inserte acá su código
+l_5 <- mx(0.5)
+x_pos <- which(xi == 0.5)
+
+# Para KS
+
+ks_05 <- vector("double", length(x))
+for(j in 1:1000){
+  ks_05[j] <- l_5 >= ic_ks[[j]]$ICI[x_pos] & l_5 <= ic_ks[[j]]$ICS[x_pos]
+}
+
+porcentaje_ks <- sum(ks_05)/length(ks_05)
+
+# Para Loess
+
+ls_05 <- vector("double", length(x))
+for(j in 1:1000){
+  ls_05[j] <- l_5 >= ic_ls[[j]]$ICI[x_pos] & l_5 <= ic_ls[[j]]$ICS[x_pos]
+}
+porcentaje_ls <- sum(ls_05)/length(ls_05)
+
+# Para Splines
+sp_05 <- vector("double", length(x))
+for(j in 1:1000){
+  sp_05[j] <- l_5 >= ic_sp[[j]]$ICI[x_pos] & l_5 <= ic_sp[[j]]$ICS[x_pos]
+}
+porcentaje_sp <- sum(sp_05)/length(sp_05)
+
+porcentaje_ks; porcentaje_ls; porcentaje_sp 
+
+```
+
+**D.** ¿Qué porcentaje de veces la banda de confianza para **todos los puntos** $x_i$ contiene *simultáneamente* todos los valores verdaderos?
+
+El 100% de la veces la banda de confianza para **todos los puntos** $x_i$ contiene *simultáneamente* todos los valores verdaderos, para los modelos de polinomios y los de splines, no así en el de Nadayara Watson.
+
+```{r, cache = TRUE}
+# inserte acá su código
+
+# Para KS
+
+ban_ic_ks <- vector("double", length(x))
+for(j in 1:1000){
+  ban_ic_ks[j] <- all(yi >= ic_ks[[j]]$ICI & yi <= ic_ks[[j]]$ICS)
+}
+porcentaje_ban_ks <- sum(ban_ic_ks)/length(ban_ic_ks)
+
+# Para Loess
+
+ban_ic_ls <- vector("double", length(x))
+for(j in 1:1000){
+  ban_ic_ls[j] <- all(yi >= ic_ls[[j]]$ICI & yi <= ic_ls[[j]]$ICS)
+}
+porcentaje_ban_ls <- sum(ban_ic_ls)/length(ban_ic_ls)
+
+# Para Splines
+
+ban_ic_sp <- vector("double", length(x))
+for(j in 1:1000){
+  ban_ic_sp[j] <- all(yi >= ic_sp[[j]]$ICI & yi <= ic_sp[[j]]$ICS)
+}
+porcentaje_ban_sp <- sum(ban_ic_sp)/length(ban_ic_sp)
+
+porcentaje_ban_ks; porcentaje_ban_ls; porcentaje_ban_sp
+
+```
+
+## PREGUNTA 3
+
+#Calcule, para xi=0.5, el sesgo, la varianza y el error cuadrático medio (MSE) de m^(0.5) como función de los parámetros par1idth, span y lambda (cuando corresponda). Utilizar entre 20-30 valores distintos en cada caso. Hint: Recordar que lambda funciona mejor en una escala logarítmica.
+
+#par1idth
+#Nadaraya-Watson
+
+```{r, cache = TRUE}
+#Nadayara 
+library(ggplot2)
+set.seed(1)
+X <- seq(-1,1,length=101)
+d <- purrr::map(function(a) X + 4*cos(7*X) + rnorm(101), .x = rep(1,1000))
+
+par1 <- seq(0.1,2,length.out = 30)  
+list1 <- list()
+for (i in 1:length(par1)) {
+  list1[[i]]  <- lapply(d, FUN = stats::ksmooth, kernel = "normal", bandwidth = par1[i] , x = X)
+}
+
+##xi-0.5
+posterior <- which(X== 0.5)
+xi11<- d[[76]] 
+
+sim1 <- rep(NA, 1000)
+sim1_bat <- list()
+
+for ( n in 1:30) {
+for ( m in 1:1000) {
+  sim1[m] <- list1[[n]][[m]]$y[76]  
+}
+  sim1_bat[[n]]<- sim1
+}
+
+#sesgo
+d <- purrr::map(function(a) {y = X + 4*cos(7*X) + rnorm(101)
+return(data.frame(X,y))},.x = rep(1,1000))
+
+ses1 <-lapply(d, FUN = function(x) x$y)
+ses1 <- do.call(cbind.data.frame, ses1)
+
+colnames(ses1)<- 1:1000
+xi11 <- as.vector(as.matrix(ses1[76,]))
+
+sesk30 <- rep(NA, 30)
+for (k in 1:30) {
+   sesk30[k]<- mean(sim1_bat[[k]]-xi11)
+}
+
+# MSE
+
+MSEK30 <- rep(NA, 30)
+for (k in 1:30) {
+  MSEK30[k]<- mean((sim1_bat[[k]]-xi11)^2)
+}
+
+#Variancia
+vark30 <- rep(NA, 30)
+for (k in 1:30) {
+  vark30[k]<- var(sim1_bat[[k]])
+}
+
+#Sesgo graficado
+sesnay <- data.frame(Sesgo = sesk30, par1idth = par1)
+ggplot(sesnay, aes(x = par1idth, y = Sesgo)) + 
+  geom_line() + 
+  labs(title = "Sesgo Nadaraya-Watson")
+
+
+#MSE graficado
+msenay <- data.frame(MSE = MSEK30, par1idth = par1)
+ggplot(msenay, aes(x = par1idth, y = MSE)) + 
+  geom_line() + 
+  labs(title = "MSE Nadaraya-Watson")
+
+
+#Variancia graficada
+varnay <- data.frame(Variancia = vark30, par1idth = par1)
+ggplot(varnay, aes(x = par1idth, y = Variancia)) + 
+  geom_line() + 
+  labs(title = "Variancia Nadaraya-Watson")
+
+```
+
+```{r, cache = TRUE}
+sesnay
+
+msenay
+
+varnay
+```
+
+
+
+
+#Span
+#Regresión polinomial
+
+```{r, cache = TRUE}
+#Span
+span1 <- seq(0.1,2,length.out = 30) 
+
+list11 <- list()
+for (i in 1:length(span1)) {
+  list11[[i]]  <- lapply(d, FUN = stats::loess, formula = y ~ X, span = span1[i], degree = 2)
+}
+
+sim1 <- rep(NA, 1000)
+sim1_bat1 <- list()
+
+for ( n in 1:30) {
+  for ( m in 1:1000) {
+    sim1[m] <- list11[[n]][[m]]$fitted[76]  
+  }
+  sim1_bat1[[n]]<- sim1
+}
+
+#Sesgo 
+sesp30 <- rep(NA, 30)
+for (k in 1:30) {
+  sesp30[k]<- mean(sim1_bat1[[k]]-xi11)
+}
+
+#MSE
+msep30 <- rep(NA, 30)
+for (k in 1:30) {
+  msep30[k]<- mean((sim1_bat1[[k]]-xi11)^2)
+}
+
+#Variancia
+varp30 <- rep(NA, 30)
+for (k in 1:30) {
+  varp30[k]<- var(sim1_bat1[[k]])
+}
+
+#Sesgo graficado
+sespol <- data.frame(Sesgo = sesp30, span = span1)
+ggplot(sespol, aes(x = span, y = Sesgo)) + 
+  geom_line() + 
+  labs(title = "Sesgo Regresión polinomial")
+
+#MSE graficado
+msepol <- data.frame(MSE = msep30, span = span1)
+ggplot(msepol, aes(x = span, y = MSE)) + 
+  geom_line() + 
+  labs(title = "MASE Regresión polinomial")
+
+
+#Variancia graficada
+varpol <- data.frame(Variancia = varp30, span = span1)
+ggplot(varpol, aes(x = span, y = Variancia)) + 
+  geom_line() + 
+  labs(title = "Variancia Regresión polinomial")
+```
+```{r, cache = TRUE}
+sespol
+
+msepol
+
+varpol
+```
+
+
+#lambda
+#splines de suavizado
+
+```{r, cache = TRUE}
+#lambda
+d <- purrr::map(function(a) {y = X + 4*cos(7*X) + rnorm(101)
+return(data.frame(X,y))},.x = rep(1,1000))
+lmbda102 <- (seq(0.000001, 0.01,length.out = 30))  
+list12 <- list()
+
+for (i in 1:length(lmbda102)) {
+  list12[[i]]  <- lapply(d, FUN = stats::smooth.spline, lambda = lmbda102[i])
+}
+
+sim1 <- rep(NA, 1000)
+sim1_bat2 <- list()
+
+for ( n in 1:30) {
+  for ( m in 1:1000) {
+    sim1[m] <- list12[[n]][[m]]$y[76]  
+  }
+  sim1_bat2[[n]]<- sim1
+}
+
+#Sesgo 
+sesspl30 <- rep(NA, 30)
+for (k in 1:30) {
+  sesspl30[k]<- mean(sim1_bat2[[k]]-xi11)
+}
+
+#MSE
+msespl30 <- rep(NA, 30)
+for (k in 1:30) {
+  msespl30[k]<- mean((sim1_bat2[[k]]-xi11)^2)
+}
+
+#Variancia
+varspl30 <- rep(NA, 30)
+for (k in 1:30) {
+  varspl30[k]<- var(sim1_bat2[[k]])
+}
+
+#Sesgo graficado
+sesspli30 <- data.frame(Sesgo = sesspl30, lambda = lmbda102)
+ggplot(sesspli30, aes(x = lambda, y = Sesgo)) + 
+  geom_line() + 
+  labs(title = "Sesgo Splines")
+
+
+#MSE graficado
+msespli30 <- data.frame(MSE = msespl30, lambda = lmbda102)
+ggplot(msespli30, aes(x = lambda, y = MSE)) + 
+  geom_line() + 
+  labs(title = "MSE Splines")
+
+
+#Variancia graficada
+varspl30 <- data.frame(Variancia = varspl30, lambda = lmbda102)
+ggplot(varspl30, aes(x = lambda, y = Variancia)) + 
+  geom_line() + 
+  labs(title = "Variancia Splines")
+```
+
+```{r, cache = TRUE}
+sesspli30
+
+msespli30
+
+varspl30
+```
+
+
+
+## PREGUNTA 4
+
+Repetir las preguntas `1` y `2` con el diseño aleatorio. De nuevo, utilice un ancho de banda `bandwidth = 0.2` para el estimador de *Nadaraya-Watson* y estime los parámetros `span` y `lambda` (asociados a los estimadores de regresión local polinomial y *splines* de suavizado) tales que los grados de libertad $d\!f$ de los tres métodos coincidan.
+
+```{r, cache = TRUE}
+set.seed(1)
+x2 <- sort(c(0.5, -1 + rbeta(50, 2, 2), rbeta(50, 2, 2)))
+```
+
+**Utilice la misma semilla que utilizó en la parte `1` para generar los errores** asociados a las 1000 simulaciones, de manera tal que las innovaciones sean las mismas a lo largo de cada simulación pero los valores $x_i$ sean los únicos que cambien entre el diseño equidistante y el diseño aleatorio.
+
+
+
+**PREGUNTA 1**
+
+**A.** Para cada una de las 1000 simulaciones calcule los estimadores de regresión de
+
+* *Nadaraya-Watson* (`ksmooth()`),
+* *regresión local polinomial* (`loess()`), y 
+* *splines de suavizado* (`smooth.spline()`) 
+
+para cada $x_i$. Para el estimador de *Nadaraya-Watson* utilice un ancho de banda de 0.2 (`bandwidth = 0.2`). Para la *regresión local polinomial* y los *splines de suavizado* estime los parámetros `span` y `lambda` tales que generen, aproximadamente, los mismos grados de libertad $d\!f$ que el estimador de *Nadaraya-Watson*.
+
+
+### Pregunta 1
+
+```{r, cache = TRUE}
+set.seed(1)
+mx = function(x2){
+  x2+4*cos(7*x2)
+}
+ei=matrix(rnorm((101*1000),0,1), nrow=101, ncol=1000)
+
+
+yi = mx(x2)+ei
+
+yv=mx(x2)
+
+```
+
+### Modelo Nayadara-Watson
+
+```{r, cache = TRUE}
+library(stats)
+modelo<-matrix(NA, nrow=101, ncol=1000)
+for (i in 1:1000) {
+  mod=ksmooth(x=x2, y=yi[,i], bandwidth = 0.2)
+  modelo[,i]<-mod$y
+}
+
+```
+
+**Para el cálculo de los grados de libertad**
+```{r, cache = TRUE}
+n<-length(yv)
+x<-x2
+S<-matrix(NA, nrow = n, ncol=n)
+colnames(S)<- 1:n
+In<-diag(n)
+h=0.2
+
+for (j in 1:n){
+  krs<-ksmooth(x=x2,
+               y=In[,j],
+               kernel = "normal",
+               bandwidth = h,
+               x.points = x)
+  S[,j]<-krs$y
+}
+
+sum(diag(S))
+
+```
+
+
+### Modelo Regresión local polinomial
+
+Ajustar el span
+
+```{r, cache = TRUE}
+
+#Para seleccionar el span. Trabajamos únicamente con una configuración (yi[,1])
+
+h=c(0.1,0.2,0.3,0.4,.5,.6,.7,.8,.9,1)
+df<-rep(0, length(h))
+for (i in 1:length(h)){
+  mod<-loess(yi[,1]~x2, span=h[i])
+  df[i]<-mod$enp
+}
+df
+
+```
+El valor más cercano a 9.93 se da entre el span igual a 0.3 y 0.4, estando más cercano a 0.3. Por ende, utilizaremos 0.358
+
+```{r, cache = TRUE}
+modelo1<-matrix(NA, nrow=101, ncol=1000)
+for (i in 1:1000) {
+  mod1<-loess(yi[,i]~x2, span = 0.358)
+  modelo1[,i]<-mod1$fitted
+}
+```
+
+
+
+### Modelo de splines de suavizado
+
+Se usan los grados de libertad igual a 9.93
+
+```{r, cache = TRUE}
+modelo2<-matrix(NA, nrow=101, ncol=1000)
+for (i in 1:1000) {
+  mod2<-smooth.spline(yi[,i]~x2, df=9.93)
+  modelo2[,i]<-(predict(mod2, x2)$y)
+}
+```
+
+
+### Pregunta B
+
+Para cada punto xi, calcule
+
+1. el sesgo empírico de m(xi) (promedio a lo largo de todas las simulaciones menos el valor verdadero m(x)),
+
+**Modelo Nayadara-Watson**
+
+```{r, cache = TRUE}
+SE1.MAT<-yv-modelo
+SE1<-rep(NA, 101)
+for (i in 1:101){
+  SE1[i]<-mean(SE1.MAT[i,])
+}
+
+```
+
+**Modelo de regresión local polinomial**
+
+```{r, cache = TRUE}
+SE2.MAT<-yv-modelo1
+SE2<-rep(NA, 101)
+for (i in 1:101){
+  SE2[i]<-mean(SE2.MAT[i,])
+}
+SE2
+```
+
+**Modelo de splines de suavizado**
+
+```{r, cache = TRUE}
+yv-modelo2[,1]
+SE3.MAT<-yv-modelo2
+SE3<-rep(NA, 101)
+for (i in 1:101){
+  SE3[i]<-mean(SE3.MAT[i,])
+}
+SE3
+```
+
+
+2. La varianza de m^(xi)
+
+**Modelo Nayadara-Watson**
+
+```{r, cache = TRUE}
+variancia1<-rep(0, 101)
+for (i in 1:101){
+  variancia1[i]<-var(modelo[i,])
+}
+
+```
+
+
+**Modelo de regresión local polinomial**
+
+```{r, cache = TRUE}
+variancia2<-rep(0, 101)
+for (i in 1:101){
+  variancia2[i]<-var(modelo1[i,])
+}
+
+```
+
+
+
+**Modelo de splines de suavizado**
+
+```{r, cache = TRUE}
+variancia3<-rep(0, 101)
+for (i in 1:101){
+  variancia3[i]<-var(modelo2[i,])
+}
+
+
+```
+
+
+
+```{r, cache = TRUE}
+RE1<-SE1.MAT^2
+MSE1<-rep (0, 101)
+for (i in 1:101){
+MSE1[i]<-(sum(RE1[,i])/101)  
+}
+
+RE2<-SE2.MAT^2
+MSE2<-rep (0, 101)
+for (i in 1:101){
+MSE2[i]<-(sum(RE2[,i])/101)  
+}
+
+RE3<-SE3.MAT^2
+MSE3<-rep (0, 101)
+for (i in 1:101){
+MSE3[i]<-(sum(RE3[,i])/101)  
+}
+
+
+```
+
+
+### Pregunta C
+
+ Grafique estas tres cantidades contra xi para los estimadores.
+ 
+ **Modelo Nayadara-Watson**
+ 
+```{r, cache = TRUE}
+library (ggplot2)
+NW<-cbind(variancia1, SE1, MSE1, x2)
+NW<-tibble::tibble(NW)
+
+graf1<-ggplot (NW) + geom_point(aes(x=x2, y=SE1))+geom_point(x=x2, y=variancia1, col="red")+geom_point(x=x2, y=MSE1, col="blue")+theme_bw()
+graf1
+
+```
+ 
+**Modelo de regresión local polinomial**
+
+```{r, cache = TRUE}
+RLP<-cbind(variancia2, SE2, MSE2, x2)
+RLP<-tibble::tibble(RLP)
+
+graf2<-ggplot (RLP) + geom_point(aes(x=x2, y=MSE2))+geom_point(x=x2, y=variancia2, col="red")+geom_point(x=x2, y=SE2, col="blue")+theme_bw()
+graf2
+
+```
+
+
+**Modelo de splines de suavizado**
+
+```{r, cache = TRUE}
+
+MSS<-cbind(variancia3, SE3, MSE3, x2)
+MSS<-tibble::tibble(MSS)
+
+graf1<-ggplot (MSS) + geom_point(aes(x=x2, y=SE3))+geom_point(x=x2, y=variancia3, col="red")+geom_point(x=x2, y=MSE3, col="blue")+theme_bw()
+graf1
+
+```
+
+### Pregunta D
+
+¿Cuál es la conexión entre el sesgo y la curvatura $m^{\prime\prime}(x)$? 
+
+Para los tres modelos no parece ser proporcional a la curva $m^{\prime\prime}(x)$, en cuyo caso no sigue la misma trayectoria.
+
+### Pregunta E
+
+¿Cómo se comporta el sesgo en los bordes?
+
+En los bordes el sesgo crece para la regresión local polinomial y splines suavizados, para el caso de Nadaraya Watson el sesgo  pareciera que es menor.
+
+
+### PREGUNTA 2
+
+**A.** Calcule el correspondiente estimado de error estándar para cada una de las 1000 simulaciones, los 101 $x_i$ y los tres estimadores de regresión estudiados según la fórmula:
+
+$$
+\hat{\text{se}}\left(\hat{m}(x_i)\right) = \sqrt{ \hat{\mathbb{V}\text{ar}}\left(\hat{m}(x_i)\right)} = \hat{\sigma}_{\epsilon} \sqrt{\left(\mathcal{S} \mathcal{S}^{\intercal} \right)_{ii}}
+$$
+
+Para estimar *manualmente* el error estándar necesitamos las correspondientes matrices de suavizado (o *hat matrices*) $\mathcal{S}$. Recuerden que las matrices $\mathcal{S}$ dependen únicamente de los puntos de diseño $x_i$ y, por ende, no deben ser calculadas para cada simulación (mas sí para cada método de regresión).
+
+```{r, cache = TRUE}
+library(tidyverse)
+```
+
+
+```{r, cache = TRUE, message=FALSE, warning=FALSE}
+
+# replicando los valores pero en una lista
+yi <- vector("list", 1000)
+
+for(i in 1:1000){
+  yi[[i]] <-  mx(x2) + rnorm(101, 0, 1)
+}
+
+nad_res <- yi %>%
+  map(~{ksmooth(x = x2, y = .x, kernel = 'normal', bandwidth = 0.2) %>%
+      pluck("y")})
+
+pol_res <- yi %>%
+  map(function(y){
+      res <- loess(y ~ x2, span = 0.358)
+      return(list(
+        fitted = res$fitted,
+        resid = res$residuals
+      ))
+  })
+
+# Replico la Matriz S para no tener NA's
+
+n <- length(x2)
+x <- x2
+S <- matrix(NA, nrow = n, ncol=n)
+colnames(S) <- 1:n
+In <- diag(n)
+h <- 0.2
+
+for (j in 1:n){
+  krs<-ksmooth(x=x,
+               y=In[,j],
+               kernel = "normal",
+               bandwidth = h,
+               x.points = x)
+  S[,j]<-krs$y
+}
+
+
+spl_res <- yi %>%
+  map(function(y){
+      res <- smooth.spline(x2, y, df = sum(diag(S)))
+      return(list(
+        fitted = res$y,
+        lambda = res$lambda
+      ))
+  })
+
+
+# Para KS
+se_ks <- vector("list", length(x2))
+raiz_S <- sqrt(S%*%t(S))
+
+for(j in 1:1000){
+  wi <- nad_res[[j]]
+  sigma_2 <- sum((wi - yi[[j]])^2)/(length(wi)-sum(diag(S)))
+  se_ks[[j]] <- sqrt(sigma_2)*diag(raiz_S)
+  
+}
+
+
+# Para Loess
+se_ls <- vector("list", length(x2))
+raiz_S <- sqrt(modelo1%*%t(modelo1))
+
+for(j in 1:1000){
+  wi <- pol_res[[j]]$fitted
+  sigma_2 <- sum((wi - yi[[j]])^2)/(length(wi)-sum(diag(modelo1)))
+  se_ls[[j]] <- sqrt(sigma_2)*diag(raiz_S)
+  
+}
+
+# Para Splines
+se_sp <- vector("list", length(x2))
+raiz_S <- sqrt(modelo2%*%t(modelo2))
+
+for(j in 1:1000){
+  wi <- spl_res[[j]]$fitted
+  sigma_2 <- sum((wi-yi[[j]])^2)/(length(wi)-sum(diag(modelo2)))
+  se_sp[[j]] <- sqrt(sigma_2)*diag(raiz_S)
+  
+}
+
+```
+
+**B.** Calcule los intervalos de confianza *locales* (*piecewise*) al 95% para los tres métodos estudiados según 
+
+$$I = \hat{m}(x_i) \pm 1.96 \cdot \hat{\text{se}}\left(\hat{m}(x_i)\right)$$
+
+```{r, cache = TRUE}
+# inserte acá su código
+
+## Para KS
+
+ic_ks <- vector("list", length(x2))
+for(j in 1:1000){
+  yi <- nad_res[[j]]
+  ic_ks[[j]] <- list()
+  ic_ks[[j]]$ICI <- yi - 1.96*se_ks[[j]]
+  ic_ks[[j]]$ICS <- yi + 1.96*se_ks[[j]]
+}
+
+## Para Loess
+ic_ls <- vector("list", length(x2))
+for(j in 1:1000){
+  yi <- pol_res[[j]]$fitted
+  ic_ls[[j]] <- list()
+  ic_ls[[j]]$ICI <- yi - 1.96*se_ls[[j]]
+  ic_ls[[j]]$ICS <- yi + 1.96*se_ls[[j]]
+}
+
+## Para Splines
+
+ic_sp <- vector("list", length(x2))
+for(j in 1:1000){
+  yi <- spl_res[[j]]$fitted
+  ic_sp[[j]] <- list()
+  ic_sp[[j]]$ICI <- yi - 1.96*se_sp[[j]]
+  ic_sp[[j]]$ICS <- yi + 1.96*se_sp[[j]]
+}
+
+```
+
+**C.** ¿Qué porcentaje de veces el intervalo de confianza *local* contiene el valor verdadero $m(0.5)$ para cada uno de los métodos estudiados?
+
+En los modelos de regresion polinomial y de splines se obtienen valores dentro de los intervalos de confianza, en otras palabras el 100% de los intervalos de confianza *local* contiene el valor verdadero de $m(0.5)$, para cada uno de estos dos modelos, no así en el caso del modelo de Nadayara Watson.
+
+
+```{r, cache = TRUE}
+# inserte acá su código
+l_5 <- mx(0.5)
+x_pos <- which(x2 == 0.5)
+
+# Para KS
+
+ks_05 <- vector("double", length(x2))
+for(j in 1:1000){
+  ks_05[j] <- l_5 >= ic_ks[[j]]$ICI[x_pos] & l_5 <= ic_ks[[j]]$ICS[x_pos]
+}
+
+porcentaje_ks <- sum(ks_05)/length(ks_05)
+
+# Para Loess
+
+ls_05 <- vector("double", length(x2))
+for(j in 1:1000){
+  ls_05[j] <- l_5 >= ic_ls[[j]]$ICI[x_pos] & l_5 <= ic_ls[[j]]$ICS[x_pos]
+}
+porcentaje_ls <- sum(ls_05)/length(ls_05)
+
+# Para Splines
+sp_05 <- vector("double", length(x2))
+for(j in 1:1000){
+  sp_05[j] <- l_5 >= ic_sp[[j]]$ICI[x_pos] & l_5 <= ic_sp[[j]]$ICS[x_pos]
+}
+porcentaje_sp <- sum(sp_05)/length(sp_05)
+
+porcentaje_ks; porcentaje_ls; porcentaje_sp 
+```
+
+**D.** ¿Qué porcentaje de veces la banda de confianza para **todos los puntos** $x_i$ contiene *simultáneamente* todos los valores verdaderos?
+
+El 100% de la veces la banda de confianza para **todos los puntos** $x_i$ contiene *simultáneamente* todos los valores verdaderos, para los modelos de polinomios y los de splines, no así en el de Nadayara Watson.
+
+```{r, cache = TRUE}
+# inserte acá su código
+
+# Para KS
+
+ban_ic_ks <- vector("double", length(x2))
+for(j in 1:1000){
+  ban_ic_ks[j] <- all(yi >= ic_ks[[j]]$ICI & yi <= ic_ks[[j]]$ICS)
+}
+porcentaje_ban_ks <- sum(ban_ic_ks)/length(ban_ic_ks)
+
+# Para Loess
+
+ban_ic_ls <- vector("double", length(x2))
+for(j in 1:1000){
+  ban_ic_ls[j] <- all(yi >= ic_ls[[j]]$ICI & yi <= ic_ls[[j]]$ICS)
+}
+porcentaje_ban_ls <- sum(ban_ic_ls)/length(ban_ic_ls)
+
+# Para Splines
+
+ban_ic_sp <- vector("double", length(x2))
+for(j in 1:1000){
+  ban_ic_sp[j] <- all(yi >= ic_sp[[j]]$ICI & yi <= ic_sp[[j]]$ICS)
+}
+porcentaje_ban_sp <- sum(ban_ic_sp)/length(ban_ic_sp)
+
+porcentaje_ban_ks; porcentaje_ban_ls; porcentaje_ban_sp
+
+```

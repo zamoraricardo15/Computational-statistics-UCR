@@ -1,0 +1,762 @@
+---
+title: "Lab 05/ Grupo 01"
+subtitle: "Fecha de entrega: 07/07/2021"
+author: "Oscar Agüero, M del Carmen Carranza, Jesús Guzmán, Ricardo Zamora"
+output: 
+  html_document:
+    theme: flatly
+    highlight: tango
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  cache= TRUE,
+  eval=TRUE,
+  echo = TRUE, 
+  fig.align = 'center',
+  fig.retina = 2,
+  fig.width = 8,
+  out.width = '100%',
+  fig.asp = 0.63
+)
+
+```
+
+
+## Instrucciones generales {.tabset .tabset-fade}
+
+Genere un `R Markdown` en donde se muestre el código utilizado y la salida de este. 
+
+### PREGUNTA 1: bootstrap
+
+Vamos a construir distintos intervalos de confianza maeidante *bootstrap* y revisar su covertura para diferentes tamaños de muestra en un estudio de simulación
+
+Primero, estimamos el promedio truncado $\theta$ de la distribución Gamma $\Gamma(2,2)$ cuando el 10% superior y 10% inferior de las observcaiones se descartan. Aproximaremos $\theta$ con base en una muestra *grande*.
+
+```{r, eval=T}
+set.seed(1)
+(th <- mean(rgamma(1e8, shape = 2, rate = 2), trim = 0.1))
+```
+
+Ahora, construimos una muestra de 40 elementos de la distribución $\Gamma(2,2)$ y estimamos $\theta$ mediante el promedio truncado $\hat{\theta}$ de la muestra.
+
+```{r eval=T}
+x40 <- rgamma(40, shape = 2, rate = 2)
+th.h <- mean(x40, trim = 0.1)
+```
+
+**A.**
+
+Construir tres diferentes intervalos de confianza al 95% utilizando bootstrap para el promedio truncado basado en la muestra `x40`. Los tres intervalos de confianza son:
+
+* **Cuantil:**  
+
+$$[q_{\hat{\theta^*}}(\alpha/2),q_{\hat{\theta^*}}(1-\alpha/2)]$$
+
+* **Aproximación normal:** 
+
+$$2\hat{\theta} - \bar{\hat{\theta}^*} \pm q_{Z}(1-\alpha/2) \cdot \widehat{\text{sd}}(\hat{\theta})$$
+
+donde $Z \sim \mathcal{N}(0,1)$ y $\widehat{\text{sd}}(\hat{\theta}) = \sqrt{\frac{1}{R-1}}\sum_{i=1}^{R}\left( \hat{\theta}^{*i}- \bar{\hat{\theta}^*} \right)^2$.
+
+* **Cuantil inverso:** 
+
+$$[\hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(1-\alpha/2), \hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(\alpha/2)].$$
+
+**Hint:** si quisieran utilizar el paquete `boot`, `'type = "perc"` corresponde con el tipo *cuantil*, `type = "norm"` corresponde con la *aproximación normal* y `type = "basic"` corresponde al *cuantil inverso*.
+
+```{r eval=T}
+library(boot)
+muestra1 <- boot(data=data.frame(x40),
+            statistic=function(d,i) return(mean(d[i,], trim = 0.1)),
+            R = 10000,sim="ordinary",stype="i")
+            boot.ci(muestra1, conf = 0.90,type = c("perc","norm", "basic"))
+```
+
+
+**B.**
+
+Simular 200 nuevos juegos de datos (de 10,40,160 y 640 observaciones cada uno) y construir diferentes intervalos de confianza con base en 500 muestras-bootstrap. Para cada tipo de intervalo de confianza, calcular el porcentaje de intervalos de confianza que no contienen el valor real $\theta$. Específicamente, si el intervalo de confianza se denota como $[\text{CI}_l, \text{CI}_u]$, calcular 
+
+* el porcentaje de veces que $\theta \notin [\text{CI}_l, \text{CI}_u]$, 
+
+* el porcentaje de veces que $\theta < \text{CI}_l$, y 
+
+* el porcentaje de veces que $\theta > \text{CI}_u$.
+
+y mostrar los resultados en forma gráfica.
+
+```{r eval= T,cache=TRUE}
+library(purrr)
+library(ggplot2)
+
+n1 <- 10
+n2 <- 40
+n3 <- 160
+n4 <- 640
+
+obs_10<- map(.x=1:200,.f=function(.x) rgamma(n1, shape = 2, rate = 2))
+
+obs_40<- map(.x=1:200,.f=function(.x) rgamma(n2, shape = 2, rate = 2))
+
+obs_160<- map(.x=1:200,.f=function(.x) rgamma(n3, shape = 2, rate = 2))
+
+obs_640<- map(.x=1:200,.f=function(.x) rgamma(n4, shape = 2, rate = 2))
+
+
+obs_10<- lapply(X=obs_10,FUN= function(x){boot(data=x,
+                              statistic=function(d,i) return(mean(d[i], trim = 0.1)),
+                              R = 500,sim="ordinary",stype="i")})
+
+obs_10<- lapply(X=obs_10,FUN=function(x) { I1<- boot.ci(x, conf = 0.95,
+                          type = c("perc","norm", "basic"))
+return(list(c(I1[["normal"]][2:3],I1[["basic"]][4:5],I1[["percent"]][4:5])))
+})
+
+obs_10 <- t(do.call(cbind.data.frame, obs_10))
+
+
+
+obs_40<- lapply(X=obs_40,FUN= function(x){boot(data=x,
+                                                 statistic=function(d,i) return(mean(d[i], trim = 0.1)),
+                                                 R = 500,sim="ordinary",stype="i")})
+
+obs_40<- lapply(X=obs_40,FUN=function(x) { I1<- boot.ci(x, conf = 0.95,
+                                                    type = c("perc","norm", "basic"))
+return(list(c(I1[["normal"]][2:3],I1[["basic"]][4:5],I1[["percent"]][4:5])))
+})
+
+obs_40 <- t(do.call(cbind.data.frame, obs_40))  
+  
+
+obs_160<- lapply(X=obs_160,FUN= function(x){boot(data=x,
+                                                 statistic=function(d,i) return(mean(d[i], trim = 0.1)),
+                                                 R = 500,sim="ordinary",stype="i")})
+
+obs_160<- lapply(X=obs_160,FUN=function(x) { I1<- boot.ci(x, conf = 0.95,
+                                                    type = c("perc","norm", "basic"))
+return(list(c(I1[["normal"]][2:3],I1[["basic"]][4:5],I1[["percent"]][4:5])))
+})
+
+obs_160 <- t(do.call(cbind.data.frame, obs_160)) 
+
+
+obs_640<- lapply(X=obs_640,FUN= function(x){boot(data=x,
+                                                   statistic=function(d,i) return(mean(d[i], trim = 0.1)),
+                                                   R = 500,sim="ordinary",stype="i")})
+
+obs_640<- lapply(X=obs_640,FUN=function(x) { I1<- boot.ci(x, conf = 0.95,
+                                                      type = c("perc","norm", "basic"))
+return(list(c(I1[["normal"]][2:3],I1[["basic"]][4:5],I1[["percent"]][4:5])))
+})
+
+obs_640 <- t(do.call(cbind.data.frame, obs_640)) 
+
+
+obs_10<- as.data.frame(cbind(obs_10,1:200,th))
+obs_40<- as.data.frame(cbind(obs_40,1:200,th))
+obs_160<- as.data.frame(cbind(obs_160,1:200,th))
+obs_640<- as.data.frame(cbind(obs_640,1:200,th))
+
+names(obs_10) <- c("I.I.Aproximación normal","I.S.Aproximación normal","I.I.Cuantil inverso",
+                 "I.S.Cuantil inverso","I.I.Cuantil","I.S.Cuantil","Muestra","Parámetro")
+
+names(obs_40) <- c("I.I.Aproximación normal","I.S.Aproximación normal","I.I.Cuantil inverso",
+                 "I.S.Cuantil inverso","I.I.Cuantil","I.S.Cuantil","Muestra","Parámetro")
+
+names(obs_160) <- c("I.I.Aproximación normal","I.S.Aproximación normal","I.I.Cuantil inverso",
+                 "I.S.Cuantil inverso","I.I.Cuantil","I.S.Cuantil","Muestra","Parámetro")
+
+names(obs_640) <- c("I.I.Aproximación normal","I.S.Aproximación normal","I.I.Cuantil inverso",
+                 "I.S.Cuantil inverso","I.I.Cuantil","I.S.Cuantil","Muestra","Parámetro")
+
+
+##########################################################################################################
+########################################## PARA 10 OBSERVACIONES #########################################
+##########################################################################################################
+
+grafico <- cbind.data.frame("I.I>Parametro"=prop.table(table(obs_10$`I.I.Aproximación normal`>obs_10$Parámetro))[2]*100,
+                            "I.S<Parametro"=prop.table(table(obs_10$`I.S.Aproximación normal`<obs_10$Parámetro))[2]*100,
+                            "I.no.contienten.parametro"=prop.table(table((obs_10$`I.S.Aproximación normal`<obs_10$Parámetro)|(obs_10$`I.I.Aproximación normal`>obs_10$Parámetro)))[2]*100
+)
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_10$`I.I.Cuantil inverso`>obs_10$Parámetro))[2]*100,
+                            "I.S<Parametro"=prop.table(table(obs_10$`I.S.Cuantil inverso`<obs_10$Parámetro))[2]*100,
+                            "I.no.contienten.parametro"=prop.table(table((obs_10$`I.S.Cuantil inverso`<obs_10$Parámetro)|(obs_10$`I.I.Cuantil inverso`>obs_10$Parámetro)))[2]*100
+
+)
+)
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_10$`I.I.Cuantil`>obs_10$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_10$`I.S.Cuantil`<obs_10$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_10$`I.S.Cuantil`<obs_10$Parámetro)|(obs_10$`I.I.Cuantil`>obs_10$Parámetro)))[2]*100
+
+                                                     
+)
+)
+
+
+
+##########################################################################################################
+########################################## PARA 40 OBSERVACIONES #########################################
+##########################################################################################################
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_40$`I.I.Aproximación normal`>obs_40$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_40$`I.S.Aproximación normal`<obs_40$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_40$`I.S.Aproximación normal`<obs_40$Parámetro)|(obs_40$`I.I.Aproximación normal`>obs_40$Parámetro)))[2]*100
+)
+)
+
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_40$`I.I.Cuantil inverso`>obs_40$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_40$`I.S.Cuantil inverso`<obs_40$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_40$`I.S.Cuantil inverso`<obs_40$Parámetro)|(obs_40$`I.I.Cuantil inverso`>obs_40$Parámetro)))[2]*100
+                                                     
+)
+)
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_40$`I.I.Cuantil`>obs_40$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_40$`I.S.Cuantil`<obs_40$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_40$`I.S.Cuantil`<obs_40$Parámetro)|(obs_40$`I.I.Cuantil`>obs_40$Parámetro)))[2]*100
+                                                     
+                                                     
+)
+)
+
+##########################################################################################################
+########################################## PARA 160 OBSERVACIONES ########################################
+##########################################################################################################
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_160$`I.I.Aproximación normal`>obs_160$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_160$`I.S.Aproximación normal`<obs_160$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_160$`I.S.Aproximación normal`<obs_160$Parámetro)|(obs_160$`I.I.Aproximación normal`>obs_160$Parámetro)))[2]*100
+)
+)
+
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_160$`I.I.Cuantil inverso`>obs_160$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_160$`I.S.Cuantil inverso`<obs_160$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_160$`I.S.Cuantil inverso`<obs_160$Parámetro)|(obs_160$`I.I.Cuantil inverso`>obs_160$Parámetro)))[2]*100
+                                                     
+)
+)
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_160$`I.I.Cuantil`>obs_160$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_160$`I.S.Cuantil`<obs_160$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_160$`I.S.Cuantil`<obs_160$Parámetro)|(obs_160$`I.I.Cuantil`>obs_160$Parámetro)))[2]*100
+                                                     
+                                                     
+)
+)
+##########################################################################################################
+########################################## PARA 640 OBSERVACIONES ########################################
+##########################################################################################################
+
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_640$`I.I.Aproximación normal`>obs_640$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_640$`I.S.Aproximación normal`<obs_640$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_640$`I.S.Aproximación normal`<obs_640$Parámetro)|(obs_640$`I.I.Aproximación normal`>obs_640$Parámetro)))[2]*100
+)
+)
+
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_640$`I.I.Cuantil inverso`>obs_640$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_640$`I.S.Cuantil inverso`<obs_640$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_640$`I.S.Cuantil inverso`<obs_640$Parámetro)|(obs_640$`I.I.Cuantil inverso`>obs_640$Parámetro)))[2]*100
+                                                     
+)
+)
+
+grafico <- rbind.data.frame(grafico,cbind.data.frame("I.I>Parametro"=prop.table(table(obs_640$`I.I.Cuantil`>obs_640$Parámetro))[2]*100,
+                                                     "I.S<Parametro"=prop.table(table(obs_640$`I.S.Cuantil`<obs_640$Parámetro))[2]*100,
+                                                     "I.no.contienten.parametro"=prop.table(table((obs_640$`I.S.Cuantil`<obs_640$Parámetro)|(obs_640$`I.I.Cuantil`>obs_640$Parámetro)))[2]*100
+)
+)
+
+```
+
+
+```{r, cache = T, eval=TRUE}
+
+grafico$length <- rep(c(n1,n2,n3,n4),times=1,each=3)
+
+grafico$Tipo.Intervalo <- rep(c("Aproximación normal", "Cuantil inverso", "Cuantil"), times = 4, each = 1)
+
+ggplot(grafico,aes(x = length, y = `I.I>Parametro`,
+                   colour = Tipo.Intervalo)) + geom_line(size = 1.3) +
+                   ggtitle("Interv. inferior > Parametro")
+
+ggplot(grafico,aes(x = length, y = `I.S<Parametro`,
+                   colour = Tipo.Intervalo)) + geom_line(size = 1.3) + 
+                   ggtitle("Interv. Superior < Parametro")
+
+ggplot(grafico,aes(x = length, y = `I.no.contienten.parametro`,
+                   colour = Tipo.Intervalo)) + geom_line(size=1.3) + 
+                   ggtitle("Interv. no contiene parametro")
+```
+
+### PREGUNTA 2: bootstrap doble
+
+En este ejercicio nos basaremos en la **PREGUNTA 1** pero aplicaremos una correción utilizando bootstrap doble. Estimamos, entonces, el promedio truncado $\theta$ de la distribución Gamma $\Gamma(2,2)$ donde dejamos por fuera el 10% superior e inferior de observaciones.
+
+```{r, eval=TRUE}
+set.seed(1)
+(th <- mean(rgamma(1e8, shape = 2, rate = 2), trim = 0.1))
+```
+
+Ahora, con base en una muestra de 40 observaciones estimamos $\hat{\theta}$ mediante un promedio truncado.
+
+```{r eval=TRUE}
+x40 <- rgamma(40, shape = 2, rate = 2)
+th.h <- mean(x40, trim = 0.1)
+```
+
+**A.**
+
+Construir intervalos de confianza al 90% mediante bootstrap para el promedio truncado $\theta$ basados en `x40`. Los intervalos de confianza requeridos son
+
+* **Cuantil inverso:**
+
+$$[\hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(1-\alpha/2), \hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(\alpha/2)]$$
+
+* **Cuantl inverso con corrección de nivel:**
+
+$$[\hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(1-\alpha^\prime/2), \hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(\alpha^\prime/2)]$$
+
+donde $\alpha^\prime$ es el nivel ajustado tal que tenemos una cobertura del 90% para $\hat{\theta}$ en la segunda capa del bootstrap.
+
+Para el bootstrap doble, usamos $M=50$ muestras para el nivel exterior y $B=500$ para la segunda capa. Al final, se calculan los intervalos de confianza basados en $B=500$ muestra con un nivel nominal $\alpha$ (para el cuantil inverso) y $\alpha^\prime$ (para los intervalos corregidos por bootstrap doble).
+
+```{r eval=TRUE}
+
+library(tidyverse)
+# inserte acá su código
+# numero de repeticiones en el primer nivel
+M <-  500
+# numero de repeticiones en el segundo nivel
+B <- 1000
+
+# Cuantil inverso con boostrap doble
+
+r <- numeric(M)
+set.seed(1)
+for(i in 1:M){
+  if(i %% 10 == 0) cat(".", if(i %% 500 == 0) sprintf(" %6d\n", i))
+  ind <- sample.int(length(x40), replace = TRUE)
+  x40_b <- x40[ind]
+  r[i] <- mean(x40_b, trim = 0.1)
+}
+
+qtl_dif <- r-th.h
+qtl_dif_val <- quantile(qtl_dif, c(0.05, 0.95))
+
+# Intervalo del cuantil inverso
+
+th.h-c(qtl_dif_val[2],qtl_dif_val[1]) 
+
+# Calcular el boostrap doble
+
+cover1 <- numeric(M)
+cover2 <- matrix(NA, nrow = M, ncol = B)
+
+set.seed(1)
+for(i in 1:M){
+  ind <- sample.int(length(x40), replace = TRUE)
+  x40_b <- x40[ind]
+  cover1[i] <- mean(x40_b, trim = 0.1)
+  for( j in 1:B){
+    ind <- sample.int(length(x40_b), replace = TRUE)
+    x40_b2 <- x40_b[ind]
+    cover2[i,j] <- mean(x40_b2, trim = 0.1)
+  }
+}
+
+# calculo de intervalos de confianza
+diff2N <- matrix(0, nrow = M, ncol = B)
+
+for(i in 1:M){
+  for (j in 1:B) {
+    diff2N[i,j]<- cover2[i,j]-cover1[i]
+  }
+}
+
+a <- 0.10
+q05 <- function( x ) quantile(x, a/2 )
+q95 <- function( x ) quantile(x, 1-a/2)
+
+
+qtl_dif_5 <- apply(diff2N, 1, q05)
+qtl_dif_95 <- apply(diff2N, 1, q95)
+
+
+IC_L <- cover1-qtl_dif_5
+IC_H<- cover1-qtl_dif_95
+
+# covertura
+
+covertura <- numeric(M)
+
+for ( i in 1:M) {
+  covertura[i] <- ifelse(IC_L[i] < th.h & th.h < IC_H[i], 1, 0 )   
+}
+
+covertura_prox <- sum(covertura)/M
+covertura_prox
+
+# Variando Alpha 
+
+q_low <- function(x,a) quantile(x, a/2 )
+q_high <- function(x,a) quantile(x, 1-a/2)
+
+
+bootdoble_aplha <- function(a, M, B, data, th.h){
+  
+  theta1N <- numeric(M)
+  theta2N <- matrix(NA, nrow = M, ncol = B)
+  
+  set.seed(1)
+  for(i in 1:M){
+    ind <- sample.int(length(data), replace = TRUE)
+    data_b <- data[ind]
+    theta1N[i] <- mean(data_b, trim = 0.1)
+    for( j in 1:B){
+      ind <- sample.int(length(data_b), replace = TRUE)
+      data_b2 <- data_b[ind]
+      theta2N[i,j] <- mean(data_b2, trim = 0.1)
+    }}
+  
+  diff2N <- matrix(NA, nrow = M, ncol = B)
+  
+  for(i in 1:M){
+    for (j in 1:B) {
+      diff2N[i,j]<- theta2N[i,j]-theta1N[i]
+    }
+  }
+  
+  quantile_dif_low <- numeric( M)
+  
+  for (i in 1:M) {
+    quantile_dif_low[i]<- q_low( diff2N[i, ]  ,a)
+  }
+  
+  quantile_dif_high <- numeric( M)
+  
+  for (i in 1:M) {
+    quantile_dif_high[i]<- q_high( diff2N[i, ]  , a)
+  }
+  
+  
+  # intervalos
+  low <- theta1N-quantile_dif_high
+  high <- theta1N-quantile_dif_low
+  
+  # cobertura
+  
+  cov <- numeric(M)
+  for ( i in 1:M) {
+    cov[i]<- ifelse( low[i]< th.h &   th.h<high[i], 1, 0 )   
+  }
+  
+  cover_prox <- sum(cov)/M 
+  return(list(cover_prox, sum(cov), M))
+}
+  
+conf_vec <- seq(from=.80,to = 0.99 ,by=0.01)
+
+res_alpha <- numeric(length(conf_vec))
+
+for (i in 1:length(conf_vec)) {
+  res_alpha[i]<- bootdoble_aplha( 1-conf_vec[i], 50, 500, x40, th.h)[[1]]
+}
+
+
+result_covertura <- data.frame(conf_vec, res_alpha) 
+result_covertura
+
+
+```
+
+```{r, eval=TRUE}
+ggplot() +
+  geom_line(result_covertura, mapping = aes(conf_vec,res_alpha), col = "sienna1") +
+  geom_point(result_covertura, mapping = aes(x=conf_vec, y=res_alpha), size=3,alpha=0.5)
+```
+
+
+**B.**
+
+Simular 200 nuevos juegos de datos (de 10,40,160 y 640 observaciones cada uno) y construir diferentes intervalos de confianza con base en 500 muestras-bootstrap. Para cada tipo de intervalo de confianza, calcular el porcentaje de intervalos de confianza que no contienen el valor real $\theta$. Específicamente, si el intervalo de confianza se denota como $[\text{CI}_l, \text{CI}_u]$, calcular 
+
+* el porcentaje de veces que $\theta \notin [\text{CI}_l, \text{CI}_u]$, 
+
+* el porcentaje de veces que $\theta < \text{CI}_l$, y 
+
+* el porcentaje de veces que $\theta > \text{CI}_u$.
+
+y mostrar los resultados en forma gráfica.
+
+```{r eval=TRUE}
+# inserte acá su código
+# caso para 10
+r <- 200
+mat_10 <- matrix(0, nrow = r, ncol = 10)
+
+for (i in 1:r) {
+  mat_10[i, ] <- rgamma(10, shape = 2, rate = 2)
+}
+
+cover10_p2 <- numeric(r)
+cover10_p2_M <- numeric(r)
+
+for (i in 1:r) {
+  aux <- bootdoble_aplha(0.10, 50, 500, mat_10[i,], th)
+  cover10_p2[i]<- aux[[2]]
+  cover10_p2_M[i]<- aux[[3]]
+}
+
+ls_10 <- sum( cover10_p2 )/ sum(cover10_p2_M)
+
+li_10 <- 1 - sum( cover10_p2 )/ sum(cover10_p2_M)
+
+li_10;ls_10
+
+result_mat_10 <- data.frame(cover10_p2, cover10_p2_M) 
+
+hist(result_mat_10$cover10_p2, xlim = c(0,50),freq = F, breaks = "FD",main = "Para caso de 10")
+lines(density(result_mat_10$cover10_p2_M), col = "red", lty = 2, lwd = 3)
+
+# caso para 40
+r <- 200
+mat_40 <- matrix(0, nrow = r, ncol = 40)
+
+for (i in 1:r) {
+  mat_40[i, ] <- rgamma(40, shape = 2, rate = 2)
+}
+
+cover40_p2 <- numeric(r)
+cover40_p2_M <- numeric(r)
+
+for (i in 1:r) {
+  aux <- bootdoble_aplha(0.10, 50, 500, mat_40[i,], th)
+  cover40_p2[i]<- aux[[2]]
+  cover40_p2_M[i]<- aux[[3]]
+}
+
+ls_40 <- sum( cover40_p2 )/ sum( cover40_p2_M )
+li_40 <- 1- sum( cover40_p2 )/ sum( cover40_p2_M )
+
+li_40;ls_40
+
+result_mat_40 <- data.frame(cover40_p2, cover40_p2_M) 
+
+hist(result_mat_40$cover40_p2, xlim = c(0,50),freq = F, breaks = "FD",main = "Para caso de 40")
+lines(density(result_mat_40$cover40_p2_M), col = "red", lty = 2, lwd = 3)
+
+# caso para 160
+r <- 200
+mat_160 <- matrix(0, nrow = r, ncol = 160)
+
+for (i in 1:r) {
+  mat_160[i, ] <- rgamma(160, shape = 2, rate = 2)
+}
+
+cover160_p2 <- numeric(r)
+cover160_p2_M <- numeric(r)
+
+for (i in 1:r) {
+  aux <- bootdoble_aplha(0.10, 50, 500, mat_160[i,], th)
+  cover160_p2[i]<- aux[[2]]
+  cover160_p2_M[i]<- aux[[3]]
+}
+
+ls_160<- sum( cover160_p2 )/ sum( cover160_p2_M )
+li_160<- 1- sum( cover160_p2 )/ sum( cover160_p2_M )
+
+li_160;ls_160
+
+
+result_mat_160 <- data.frame(cover160_p2, cover160_p2_M) 
+
+hist(result_mat_160$cover160_p2, xlim = c(0,50),freq = F, breaks = "FD",main = "Para caso de 160")
+lines(density(result_mat_160$cover160_p2_M), col = "red", lty = 2, lwd = 3)
+
+# caso para 640
+r <- 200
+mat_640 <- matrix(0, nrow = r, ncol = 640)
+
+for (i in 1:r) {
+  mat_640[i, ] <- rgamma(640, shape = 2, rate = 2)
+}
+
+cover640_p2 <- numeric(r)
+cover640_p2_M <- numeric(r)
+
+for (i in 1:r) {
+  aux <- bootdoble_aplha(0.10, 50, 500, mat_640[i,], th)
+  cover640_p2[i]<- aux[[2]]
+  cover640_p2_M[i]<- aux[[3]]
+}
+
+ls_640<- sum( cover640_p2 )/ sum( cover640_p2_M )
+li_640<- 1- sum( cover640_p2 )/ sum( cover640_p2_M )
+li_640;ls_160
+
+result_mat_640 <- data.frame(cover640_p2, cover640_p2_M) 
+
+
+```
+
+```{r, eval=TRUE}
+hist(result_mat_640$cover640_p2, xlim = c(0,50),freq = F, breaks = "FD",main = "Para caso de 640")
+lines(density(result_mat_640$cover640_p2_M), col = "red", lty = 2, lwd = 3)
+```
+
+
+### PREGUNTA 3: bootstrap paramétrico
+
+En este ejercicio aplicamos bootstrap paramétrico *a mano* y lo comparamos con los resulados del paquete `boot` de R. La cantidad de interés $\theta$ es el percentil 75% de una serie  de tiempos de espera $t$ (en días) para resolver un tipo de consulta en una oficina administrativa de la Universidad (durante el año 2021).
+
+```{r eval=TRUE}
+t <- c(17,26,12,6,12,18,10,12,26,13,13,11,12,25,7,21,44,10,21)
+```
+
+**A.**
+
+Ajustar los parámetros de una distribución Gamma mediante máxima verosimilitud.
+
+**Hint:** pueden utilizar la función `fitdistr()` del paquete `MASS`.
+
+```{r eval=TRUE}
+# inserte acá su código
+library(MASS)
+parametros <- fitdistr(t, densfun = "gamma")
+
+x <- rgamma(t, shape = parametros$estimate[1], rate =parametros$estimate[2])
+x
+```
+
+
+
+**B.**
+
+Plotear un histograma de la variable $t$ junto con la distribución ajustada superpuesta.
+
+```{r eval=TRUE}
+# inserte acá su código
+tiempos <- data.frame(t,x)
+
+# forma 1
+hist(tiempos$t, xlim = c(0,50),freq = F, breaks = "FD",main = "Tiempo de espera", xlab = "Tiempos")
+lines(density(tiempos$x), col = "red", lty = 2, lwd = 3)
+legend("topright", c("t = Tiempos de Espera", "x = Dist. Gamma Ajustada"), lty =1:2)
+
+```
+
+
+**C.**
+
+Generar 1000 muestras-bootstrap utilizando bootstrap paramétrico *a mano* (sin utiliza el paquete `boot`) y estimar los correspondientes $\hat{\theta}_{n}^{*1}, \dots, \hat{\theta}_{n}^{*1000}$.
+
+```{r eval=TRUE}
+# inserte acá su código
+muestras <- matrix(0, nrow = 1000, ncol = 19)
+
+
+for(i in 1:1000){
+  
+  muestras[i,] <- rgamma(n = 19, shape = parametros$estimate[1], rate =parametros$estimate[2] )
+  
+}
+
+quantile_75 <- function(x) quantile(x, 0.75)
+
+muestra_hat <- apply(muestras, 1, FUN = quantile_75)
+
+muestra_hat
+
+```
+
+
+
+**D.** 
+
+Construir los siugientes intervalos de confianza para $\theta$ *a mano* con base en las muestras-bootstrap (90%):
+
+* **Cuantil:**  
+
+$$[q_{\hat{\theta^*}}(\alpha/2),q_{\hat{\theta^*}}(1-\alpha/2)]$$
+
+* **Aproximación normal:** 
+
+$$2\hat{\theta} - \bar{\hat{\theta}^*} \pm q_{Z}(1-\alpha/2) \cdot \widehat{\text{sd}}(\hat{\theta})$$
+
+donde $Z \sim \mathcal{N}(0,1)$ y $\widehat{\text{sd}}(\hat{\theta}) = \sqrt{\frac{1}{R-1}}\sum_{i=1}^{R}\left( \hat{\theta}^{*i}- \bar{\hat{\theta}^*} \right)^2$.
+
+* **Cuantil inverso:** 
+
+$$[\hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(1-\alpha/2), \hat{\theta}-q_{\hat{\theta}^*-\hat{\theta}}(\alpha/2)].$$
+
+```{r eval=TRUE}
+# inserte acá su código
+a <- 0.10
+
+quantile(muestra_hat, c(a/2,1-a/2))
+
+# Aproximacion normal
+
+theta_t <- quantile(t, 0.75)
+theta_hat <- mean(muestra_hat)
+sd <- sd(muestra_hat)
+qz <- qnorm(1-a/2)
+
+c(2*theta_t-theta_hat -qz*sd, 2*theta_t-theta_hat + qz*sd)
+
+# Cuantile inverso
+d_theta <-muestra_hat-theta_t
+quantile(d_theta, c(a/2,1-a/2))
+c(theta_t-quantile(d_theta, 1-a/2), theta_t-quantile(d_theta, a/2))
+
+
+```
+
+
+**E.**
+
+Construir los mismos intervalos de confianza mediante el paquete `boot` y compararlos con los intervalos estimados en la parte **D.**.
+
+**Hint:** utilice `boot(..., sim="parametric", ran.gen = ..., mle = ...)`. Revise la ayuda de la función `boot` para más detalles.
+
+```{r eval=TRUE}
+# inserte acá su código
+library(boot)
+
+t.func <- function(data) quantile(data, 0.75)
+t.rg <- function(data, mle) {
+  est <- rgamma(length(data),shape = mle[[1]] , rate = mle[[2]] )
+  est }
+log_sum <- sum(t*log(t))
+
+usando_boot = boot(data=t, statistic =  t.func, sim="parametric", 
+                  ran.gen=t.rg , mle = parametros$estimate  , R=1000)
+
+
+# IC Cuantil
+boot.ci (usando_boot , type="perc", conf = 0.90)
+
+# IC Normal
+boot.ci (usando_boot , type="norm", conf = 0.90)
+
+# IC inverso
+boot.ci (usando_boot , type="basic", conf = 0.90)
+
+```
+
+
+
+
+
+
+
+
+

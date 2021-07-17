@@ -1,0 +1,750 @@
+---
+title: "Lab 04"
+subtitle: "Fecha de entrega: 14/07/2021"
+author: "Juan José Leitón Montero"
+output: 
+  html_document:
+    
+    theme: flatly
+    highlight: tango
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(copula)
+library(patchwork)
+
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  cache=TRUE,
+  fig.align = 'center',
+  fig.retina = 2,
+  fig.width = 8,
+  out.width = '100%',
+  fig.asp = 0.63
+)
+
+```
+
+## Instrucciones generales {.tabset .tabset-fade}
+
+Genere un `R Markdown` en donde se muestre el código utilizado y la salida de este.
+
+### PREGUNTA 1: Dependencia
+
+Lea los archivos `dat11.csv`, `dat12.csv` y `dat13.csv`, los cuales cuentan con dos columnas denominadas `x` y `y`.
+
+**A.**
+
+Realice un gráfico de puntos (*scatter*) en el cual se muestren los *scatter plots* de cada uno de los juegos de datos. Incluya, además, un modelo lineal superpuesto a cada nube de puntos y agregue el valor del coeficiente de correlación (de Pearson) a cada uno de los gráficos.
+
+Sugerencia: utilice los paquetes [`ggplot2`](https://ggplot2.tidyverse.org/) y [`patchwork`](https://patchwork.data-imaginist.com/).
+
+```{r eval=TRUE}
+library(readr)
+dat11 <- read_csv("dat11.csv")
+dat12 <- read_csv("dat12.csv")
+dat13 <- read_csv("dat13.csv")
+
+a=round(cor(dat11$X, dat11$Y),2)
+a=paste0("cor=",a)
+b=round(cor(dat12$X, dat12$Y),2)
+b=paste0("cor=",b)
+c=round(cor(dat13$X, dat13$Y),2)
+c=paste0("cor=",c)
+g1<-ggplot(dat11, aes(x=X, y=Y))+
+  geom_point()+
+  theme_bw()+
+  geom_smooth(method="lm")+
+  geom_text(x=2, y=-3 ,label=a)
+
+g2<-ggplot(dat12, aes(x=X, y=Y))+
+  geom_point()+
+  theme_bw()+
+  geom_smooth(method="lm")+
+  geom_text(x=7.5, y=0 ,label=b)
+  
+
+g3<-ggplot(dat13, aes(x=X, y=Y))+
+  geom_point()+
+  theme_bw()+
+  geom_smooth(method="lm")+
+  geom_text(x=15, y=-25 ,label=c)
+ 
+
+g1+g2+g3
+
+```
+
+**B.**
+
+Realice un gráfico en el cual se muestren las densidades marginales de cada tabla de datos. Sugerencia: utilice la función `geom_density()` del paquete `ggplot`.
+
+```{r eval=TRUE}
+g4<-ggplot(dat11, aes(x=X, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=Y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+  
+g5<-ggplot(dat12, aes(x=X, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=Y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+g6<-ggplot(dat13, aes(x=X, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=Y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+g4+g5+g6
+
+```
+
+**C.**
+
+Estime las pseudo observaciones para cada una de las variables de cada *dataset*, donde las pseudo-observaciones vienen dadas por
+
+$$\hat{U}_{ij}=\frac{R_{ij}}{n+1}$$
+
+con $R_{ij}$ el rank de la $j$-ésima componente de la $i$-+esima observación, $n$ es el número total de observaciones y $\hat{U}_{ij}$ es la $j$-ésima componente de la $i$-ésima pseudo-observación (también conocidas como ranks normalizados).
+
+```{r eval=TRUE}
+dat11$xr = ave(dat11$X,FUN= function(x) rank(x, ties.method = "first"))
+dat11$yr = ave(dat11$Y,FUN= function(x) rank(x, ties.method = "first"))
+dat11$xu<-dat11$xr/(length(dat11$xr+1))
+dat11$yu<-dat11$yr/(length(dat11$yr+1))
+
+dat12$xr = ave(dat12$X,FUN= function(x) rank(x, ties.method = "first"))
+dat12$yr = ave(dat12$Y,FUN= function(x) rank(x, ties.method = "first"))
+dat12$xu<-dat12$xr/(length(dat12$xr+1))
+dat12$yu<-dat12$yr/(length(dat12$yr+1))
+
+dat13$xr = ave(dat13$X,FUN= function(x) rank(x, ties.method = "first"))
+dat13$yr = ave(dat13$Y,FUN= function(x) rank(x, ties.method = "first"))
+dat13$xu<-dat13$xr/(length(dat13$xr+1))
+dat13$yu<-dat13$yr/(length(dat13$yr+1))                    
+
+
+```
+
+Repita los gráficos de la parte **A** (*scatter plot*, modelo lineal superpuesto y coeficiente de correlación de Pearson) utilizando los valores de $\hat{U}$ (las pseudo-observaciones) en lugar de los valores originales $x$ (las observaciones).
+
+```{r eval=TRUE}
+d=round(cor(dat11$xu, dat11$yu),2)
+d=paste0("cor=",d)
+e=round(cor(dat12$xu, dat12$yu),2)
+e=paste0("cor=",e)
+f=round(cor(dat13$xu, dat13$yu),2)
+f=paste0("cor=",f)
+
+g7<-ggplot(dat11, aes(x=xu, y=yu))+
+  geom_point()+
+  theme_bw()+
+  geom_smooth(method="lm")+
+  geom_text(x=2, y=-3 ,label=d)
+
+g8<-ggplot(dat12, aes(x=xu, y=yu))+
+  geom_point()+
+  theme_bw()+
+  geom_smooth(method="lm")+
+  geom_text(x=7.5, y=0 ,label=e)
+  
+
+g9<-ggplot(dat13, aes(x=xu, y=yu))+
+  geom_point()+
+  theme_bw()+
+  geom_smooth(method="lm")+
+  geom_text(x=15, y=-25 ,label=f)
+ 
+
+g7+g8+g9
+
+```
+
+**D.**
+
+Calcule el $\rho$ de Spearman con base en los datos originales $X$ y compárelo con el coeficiente de correlación (de Pearson) estimado con base en las pseudo-observaciones $\hat{U}$. 
+
+Sugerencia: utilice la función `cor( , method = "spearman")`.
+
+```{r eval=TRUE}
+cor(dat11$X,dat11$Y, method = "spearman")
+cor(dat12$X,dat12$Y, method = "spearman")
+cor(dat13$X,dat13$Y, method = "spearman")
+
+```
+
+¿Cómo son estos valores?
+
+Cómo es posible observar, la correlación de Spearman es igual a la coeficiente de correlación de Pearson cuando los datos son "acomodados" o rankeados. Esto se da pues la correlación de Spearman se utiliza principalmente para variables ordinales, es decir que siguen un orden. Por ende, en el ejercicio lo que se realizó fue establecer el ranking, y con ello se puede calcular la correlación. Además, se muestra que los coeficientes son iguales, lo que indica que si bien los datos son diferentes entre las bases, cuando se ordenan siguen un comportamiento igual. 
+
+**E.**
+
+¿Qué nota de estos gráficos generados en la parte **D**? ¿Qué puede concluir con respecto a la dependencia entre variables y sus marginales?
+
+Cuando las variables son rankeadas (rank normalizados), se nota que siguen el mismo comportamiento. La correlación entre las variables es igual en los 3 conjuntos de datos analizados. 
+
+### PREGUNTA 2: Correlación
+
+Lea los archivos `dat21.csv`, `dat22.csv`, `dat23.csv` y `dat24`, los cuales cuentan con dos columnas denominadas `x` y `y`.
+
+::: {align="center"}
+<mark> **POR EL MOMENTO NO VISUALICE LOS DATOS** </mark>
+:::
+
+**A.**
+
+Calcule la correlación entre las variables `x` y `y` para cada set de datos
+
+```{r eval=TRUE}
+dat21 <- read_csv("dat21.csv")
+dat22 <- read_csv("dat22.csv")
+dat23 <- read_csv("dat23.csv")
+dat24 <- read_csv("dat24.csv")
+
+a<-round(cor(dat21$x, dat21$y),2)
+a<-paste ("correlación de base 1= ", a )
+a
+
+b<-round(cor(dat22$x, dat22$y),2)
+b<-paste ("correlación de base 2= ", b )
+b
+
+c<-round(cor(dat23$x, dat23$y),2)
+c<-paste ("correlación de base 1= ", c)
+c
+
+d<-round(cor(dat24$x, dat24$y),2)
+d<-paste ("correlación de base 1= ", d )
+d
+
+```
+
+**B.**
+
+Grafique las marginales de cada una de las distribuciones para cada set de datos.
+
+```{r eval=TRUE}
+g10<-ggplot(dat21, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+  
+g11<-ggplot(dat22, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+g12<-ggplot(dat23, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+g13<-ggplot(dat24, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+(g10|g11)/(g12|g13)
+
+```
+
+
+**C.**
+
+Visualice, **mediante gráficos de puntos**, los 4 sets de datos.
+
+Sugerencia: utilice un valor de `alpha` adecuado para poder dar una idea de en qué sitios se tiene mayor densidad de puntos. Además, utilizar `shape=16` para evitar que el marcador tenga borde.
+
+```{r, eval=TRUE}
+g14<-ggplot(dat21, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+
+g15<-ggplot(dat22, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+
+g16<-ggplot(dat23, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+ 
+g17<-ggplot(dat24, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+  
+(g14|g15)/(g16|g17)
+
+
+```
+
+**D.**
+
+Visualice, **mediante gráficos de contornos**, los 4 sets de datos.
+
+Sugerencia: utilice alguna de las funciones `geom_density_2d()` o `geom_density_2d_filled()`
+
+```{r eval=TRUE}
+
+g18<-ggplot(dat21, aes(x=x, y=y))+
+  geom_density_2d()+
+  theme_bw()
+
+g19<-ggplot(dat22, aes(x=x, y=y))+
+  geom_density_2d()+
+  theme_bw()
+
+g20<-ggplot(dat23, aes(x=x, y=y))+
+  geom_density_2d()+
+  theme_bw()
+ 
+g21<-ggplot(dat24, aes(x=x, y=y))+
+  geom_density_2d()+
+  theme_bw()
+  
+(g18|g19)/(g20|g21)
+
+
+```
+
+**E.**
+
+¿Qué puede concluir de estas figuras con respecto a las marginales y el coeficiente de correlación?
+
+En los 4 conjunto de datos la correlación es de 0.7. Si se observan los gráficos, se comprueba esta pero se muestra que en el primer conjunto de datos, los datos siguen una nube más homogénea, en donde la distribución es similar en todos los puntos. En el caso de el segundo y el tercer conjunto de datos se muestra que en un momento los datos están más agrupados, pero en otro momento están más dispersos. En el conjunto de datos 2 la agrupación se da en los valores altos de **x** y **y** y la dispersión en los bajos, mientras que en el conjunto de datos 3 la dispersión es mayor en los valores altos de **x** y **y**. En el conjunyto 4, en los extremos los valores están menos dispersos, pero al centro de los valores se tiene una mayor dispersión. 
+
+
+### PREGUNTA 3: Coeficiente de cola
+
+El coeficiente de cola es una medida de **dependencia extrema**. Es decir, dependencia en las colas.
+
+------------------------------------------------------------------------
+
+**Interludio**
+
+Si tenemos un vector aleatorio $(X_1, X_2)$ con funciones de distribución marginales $F_1, F_2$, y dado que los límites existan, el coeficiente de cola inferior y superior de $X_1$ y $X_2$ vienen dados por
+
+$$\lambda_l = \lim_{q \to 0} \mathbb{P}(X_2 \leq F_2^{\leftarrow}(q)|X_1 \leq F_1^{\leftarrow}(q)), $$
+
+$$\lambda_u = \lim_{q \to 1} \mathbb{P}(X_2 > F_2^{\leftarrow}(q)|X_1 > F_1^{\leftarrow}(q))$$
+
+respectivamente.
+
+------------------------------------------------------------------------
+
+Lea los archivos `dat31.csv`, `dat32.csv`, `dat33.csv` y `dat34`, los cuales cuentan con dos columnas denominadas `x` y `y`. Adicionalmente, las marginales de todos los archivos son normales estándar.
+
+```{r}
+dat31 <- read_csv("dat31.csv")
+dat32 <- read_csv("dat32.csv")
+dat33 <- read_csv("dat33.csv")
+dat34 <- read_csv("dat34.csv")
+```
+
+
+**A.**
+
+Visualice los datos mediante gráficos de puntos o contornos.
+
+```{r eval=TRUE}
+# inserte acá su código
+g22<-ggplot(dat31, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+
+g23<-ggplot(dat32, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+
+g24<-ggplot(dat33, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+ 
+g25<-ggplot(dat34, aes(x=x, y=y))+
+  geom_point(shape=16, alpha=1/10)+
+  theme_bw()
+  
+(g22|g23)/(g24|g25)
+
+```
+
+**B.**
+
+visualice las marginales de los datos para cada *dataset*.
+
+```{r eval=TRUE}
+
+g26<-ggplot(dat31, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+  
+g27<-ggplot(dat32, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+g28<-ggplot(dat33, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+g29<-ggplot(dat34, aes(x=x, col="X"))+
+  geom_density()+ theme_bw()+
+  geom_density(aes(x=y, col="Y"))+
+  scale_color_manual(values=c("red", "blue"))+
+  labs(col="Datos")
+
+(g26|g27)/(g28|g29)
+
+
+```
+
+**C.**
+
+Para los cuantiles asociados a `ql = seq(0.0001,0.1,by=0.0001)` y `qu = seq(0.9,0.9999,by=0.0001)` estime la proporción de puntos que caen en las regiones $X_2 \leq F_2^{\leftarrow}(q_l) \land X_1 \leq F_1^{\leftarrow}(q_l)$ y $X_2 > F_2^{\leftarrow}(q_u) \land X_1 > F_1^{\leftarrow}(q_u)$ como un proxy de la probabilidad. Mostrar los resultados mediante gráficos en los cuales se muestren los valores $\lambda_l$ y $\lambda_u$ como función de $q_l$ y $q_u$, respectivamente.
+
+```{r eval=TRUE}
+
+#x <- dat31$x
+#y <- dat31$y
+mat31 <- as.matrix(dat31)
+mat32 <- as.matrix(dat32)
+mat33 <- as.matrix(dat33)
+mat34 <- as.matrix(dat34)
+#for(i in 1:100000)
+#{
+ #   mat[i,1] <- x[,1][i]
+  #  mat[i,2] <- y[,1][i]
+#}
+
+ql = seq(0.0001,0.1,by=0.0001)
+qu = seq(0.9,0.9999,by=0.0001)
+
+plot(mat31[,1],mat31[,2], main="Observaciones actuales dat31",xlab="x",ylab="y",col="blue") #Observaciones actuales
+lines(ql, qu, lty=1, col="red")
+plot(mat32[,1],mat32[,2], main="Observaciones actuales dat32",xlab="x",ylab="y",col="blue")
+lines(ql, qu, lty=1, col="red")
+plot(mat33[,1],mat33[,2], main="Observaciones actuales dat33",xlab="x",ylab="y",col="blue")
+lines(ql, qu, lty=1, col="red")
+plot(mat34[,1],mat34[,2], main="Observaciones actuales dat34",xlab="x",ylab="y",col="blue")
+lines(ql, qu, lty=1, col="red")
+```
+
+**dat31**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat31),method="ml")
+# coeficientes
+rho <- coef(fit.cop)
+print(rho)
+
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+#points(u1[,1],u1[,2],col="red")
+plot(u1[,1],u1[,2],main="Observaciones simuladas dat31",xlab="q",ylab="lambda", col="red") #data simulada
+```
+
+```{r eval=TRUE}
+# Empleando histograma
+xhist <- hist(mat31[,1], breaks=30, plot=FALSE)
+yhist <- hist(mat31[,2], breaks=30, plot=FALSE) 
+top <- max(c(xhist$counts, yhist$counts)) 
+xrange <- c(-4,4)
+yrange <- c(-6,6)
+nf <- layout(matrix(c(2,0,1,3),2,2,byrow=TRUE), c(3,1), c(1,3), TRUE) 
+par(mar=c(3,3,1,1)) 
+plot(mat31[,1], mat31[,2], xlim=xrange, ylim=yrange, xlab="", ylab="") 
+par(mar=c(0,3,1,1)) 
+barplot(xhist$counts, axes=FALSE, ylim=c(0, top), space=0) 
+par(mar=c(3,0,1,1)) 
+barplot(yhist$counts, axes=FALSE, xlim=c(0, top), space=0, horiz=TRUE)
+```
+
+**dat32**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat32),method="ml")
+
+rho <- coef(fit.cop)
+print(rho)
+
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+plot(u1[,1],u1[,2],main="Observaciones simuladas dat32",xlab="q",ylab="lambda", col="red")
+```
+
+```{r eval=TRUE}
+# Empleando histograma
+xhist <- hist(mat32[,1], breaks=30, plot=FALSE)
+yhist <- hist(mat32[,2], breaks=30, plot=FALSE) 
+top <- max(c(xhist$counts, yhist$counts)) 
+xrange <- c(-4,4)
+yrange <- c(-6,6)
+nf <- layout(matrix(c(2,0,1,3),2,2,byrow=TRUE), c(3,1), c(1,3), TRUE) 
+par(mar=c(3,3,1,1)) 
+plot(mat32[,1], mat32[,2], xlim=xrange, ylim=yrange, xlab="", ylab="") 
+par(mar=c(0,3,1,1)) 
+barplot(xhist$counts, axes=FALSE, ylim=c(0, top), space=0) 
+par(mar=c(3,0,1,1)) 
+barplot(yhist$counts, axes=FALSE, xlim=c(0, top), space=0, horiz=TRUE)
+```
+
+**dat33**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat33),method="ml")
+
+rho <- coef(fit.cop)
+print(rho)
+
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+plot(u1[,1],u1[,2],main="Observaciones simuladas dat33",xlab="q",ylab="lambda", col="red")
+```
+
+```{r eval=TRUE}
+# Empleando histograma
+xhist <- hist(mat33[,1], breaks=30, plot=FALSE)
+yhist <- hist(mat33[,2], breaks=30, plot=FALSE) 
+top <- max(c(xhist$counts, yhist$counts)) 
+xrange <- c(-4,4)
+yrange <- c(-6,6)
+nf <- layout(matrix(c(2,0,1,3),2,2,byrow=TRUE), c(3,1), c(1,3), TRUE) 
+par(mar=c(3,3,1,1)) 
+plot(mat33[,1], mat33[,2], xlim=xrange, ylim=yrange, xlab="", ylab="") 
+par(mar=c(0,3,1,1)) 
+barplot(xhist$counts, axes=FALSE, ylim=c(0, top), space=0) 
+par(mar=c(3,0,1,1)) 
+barplot(yhist$counts, axes=FALSE, xlim=c(0, top), space=0, horiz=TRUE)
+```
+
+**dat34**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat34),method="ml")
+
+rho <- coef(fit.cop)
+print(rho)
+
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+plot(u1[,1],u1[,2],main="Observaciones simuladas dat34",xlab="q",ylab="lambda", col="red")
+```
+
+```{r eval=TRUE}
+# Empleando histograma
+xhist <- hist(mat34[,1], breaks=30, plot=FALSE)
+yhist <- hist(mat34[,2], breaks=30, plot=FALSE) 
+top <- max(c(xhist$counts, yhist$counts)) 
+xrange <- c(-4,4)
+yrange <- c(-6,6)
+nf <- layout(matrix(c(2,0,1,3),2,2,byrow=TRUE), c(3,1), c(1,3), TRUE) 
+par(mar=c(3,3,1,1)) 
+plot(mat34[,1], mat34[,2], xlim=xrange, ylim=yrange, xlab="", ylab="") 
+par(mar=c(0,3,1,1)) 
+barplot(xhist$counts, axes=FALSE, ylim=c(0, top), space=0) 
+par(mar=c(3,0,1,1)) 
+barplot(yhist$counts, axes=FALSE, xlim=c(0, top), space=0, horiz=TRUE)
+```
+
+
+**D.**
+
+Repita la parte **C** pero utilizando directamente las pseudo-observaciones y las variables $q_l$ y $q_u$. COmpare estos resultados con los de parte **C**.
+
+**dat31**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat31),method="ml")
+# coeficientes
+rho <- coef(fit.cop)
+print(rho)
+
+# Pseudo observaciones
+p_obs <- pobs(mat31)
+plot(p_obs, main="Pseudo-oservaciones dat31",xlab="q",ylab="lambda", col="blue")
+
+
+plot(p_obs[,1],p_obs[,2],main="Pseudo vs simulado dat31: azul/rojo",xlab="q",ylab="lambda",col="blue")
+# data simulada
+set.seed(100)
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+points(u1[,1],u1[,2],col="red")
+```
+
+**dat32**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat32),method="ml")
+# coeficientes
+rho <- coef(fit.cop)
+print(rho)
+
+# Pseudo observaciones
+p_obs <- pobs(mat32)
+plot(p_obs, main="Pseudo-oservaciones dat32",xlab="q",ylab="lambda", col="blue")
+
+
+plot(p_obs[,1],p_obs[,2],main="Pseudo vs simulado dat32: azul/rojo",xlab="q",ylab="lambda",col="blue")
+# Simulate data
+set.seed(100)
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+points(u1[,1],u1[,2],col="red")
+```
+
+**dat33**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat33),method="ml")
+
+rho <- coef(fit.cop)
+print(rho)
+
+# Pseudo 
+p_obs <- pobs(mat33)
+plot(p_obs, main="Pseudo-oservaciones dat33",xlab="q",ylab="lambda", col="blue")
+
+
+plot(p_obs[,1],p_obs[,2],main="Pseudo vs simulado dat33: azul/rojo",xlab="q",ylab="lambda",col="blue")
+# Simulate data
+set.seed(100)
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+points(u1[,1],u1[,2],col="red")
+
+
+
+```
+
+**dat34**
+```{r eval=TRUE}
+normal.cop <- normalCopula(dim=2)
+fit.cop<- fitCopula(normal.cop,pobs(mat34),method="ml")
+
+rho <- coef(fit.cop)
+print(rho)
+
+# Pseudo
+p_obs <- pobs(mat34)
+plot(p_obs, main="Pseudo-oservaciones dat34",xlab="q",ylab="lambda", col="blue")
+
+
+plot(p_obs[,1],p_obs[,2],main="Pseudo vs simulado dat34: azul/rojo",xlab="q",ylab="lambda",col="blue")
+
+set.seed(100)
+u1 = rCopula(100000,normalCopula(coef(fit.cop),dim=2))
+points(u1[,1],u1[,2],col="red")
+```
+
+### PREGUNTA 4: Lectura
+
+Leer [Recipe for a disaster: The Formula That Killed Wall Street](https://www.wired.com/2009/02/wp-quant/) y escribir un pequeño ensayo acerca de qué le pareció el artículo. Pueden intentar plantear y responder preguntas como si podría pasar algo similar en su trabajo, si consideran la dependencia/estructura de los datos (sí: ¿cómo lo hacen?; no: ¿deberían hacerlo?).
+
+Al considerar el trabajo con los datos, existen algunos elementos que son imprescindibles a la hora de realizar la estimación de modelos. Uno de esos elementos es la estructura que tienen esos datos, pero aún más importante es poder contextualizarlos, ya que los datos por si solos no pueden dar suficiente información, y el malinterpretarlos puede generar problemas importantes e incluso crisis, como lo señala el artículo leído.
+
+En este sentido, el uso de la correlación como elemento para modelar datos puede ser correcto, pero entender que este es un indicador que se puede considerar “dinámico”, ya que no es necesariamente el mismo en distintos momentos históricos. Por ende, al realizar un análisis a lo largo del tiempo, considerar la correlación como parte de un modelaje de datos es incurrir en el error.
+
+Sin embargo, existe ante esto una problemática, y es que la modelación de datos siempre conlleva a la incertidumbre, ya que al analizar variables se toman elementos que son pasado, y si el objetivo es la predicción, está siempre llevará consigo el elemento de la incertidumbre. Sin embargo, en los modelos en que se tienen repercusiones económicas, como los mostrados en el artículo, la idea de la medición y la reducción del riesgo al mínimo.  
+
+
+
+### {-}
+
+#### PREGUNTA 1
+
+```{r eval=FALSE}
+
+# CÓDIGO UTILIZADO PARA GENERAR LOS DATOS
+
+set.seed(1)
+n <- 1e4
+
+cl3 <- claytonCopula(param = 3, dim = 2)
+U <- rCopula(n, cl3) %>% 
+  as_tibble() %>% 
+  setNames(nm = c("x","y"))
+
+U  %>% 
+  mutate(x = qnorm(x, -1, 2),
+         y = qnorm(y)) %>%
+  write_csv(file = 'dat11.csv')
+
+U %>% 
+  mutate(x = qexp(x),
+         y = qexp(y, 2)) %>% 
+  write_csv(file = 'dat12.csv')
+
+U %>%
+  mutate(x = qt(x, 3),
+         y = qt(y, 3)) %>%
+  write_csv(file = 'dat13.csv')
+
+```
+
+#### PREGUNTA 2
+
+```{r eval = FALSE}
+
+# CÓDIGO UTILIZADO PARA GENERAR LOS DATOS
+
+set.seed(1)
+n <- 1e5 
+
+rCopula(n, copula = normalCopula(0.7)) %>% qnorm() %>%
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat21.csv')
+
+rCopula(n, copula = gumbelCopula(2)) %>% qnorm() %>% 
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat22.csv')
+
+rCopula(n, copula = claytonCopula(2.2)) %>% qnorm() %>% 
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat23.csv')
+
+rCopula(n, copula = tCopula(0.73)) %>% qnorm() %>% 
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat24.csv')
+
+```
+
+#### PREGUNTA 3
+
+```{r eval=FALSE}
+
+# CÓDIGO UTILIZADO PARA GENERAR LOS DATOS
+
+set.seed(1)
+n <- 1e5
+
+th.n <- iTau(normalCopula(), tau = 0.7)
+th.t <- iTau(tCopula(df = 3), tau = 0.7)
+th.c <- iTau(claytonCopula(), tau = 0.7)
+th.g <- iTau(gumbelCopula(), tau = 0.7)
+
+rCopula(n, copula = normalCopula(th.n)) %>% qnorm() %>%
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat31.csv')
+
+rCopula(n, copula = gumbelCopula(th.g)) %>% qnorm() %>% 
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat32.csv')
+
+rCopula(n, copula = claytonCopula(th.c)) %>% qnorm() %>% 
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat33.csv')
+
+rCopula(n, copula = tCopula(th.t)) %>% qnorm() %>% 
+  as_tibble() %>% setNames(nm = c("x","y")) %>% 
+  write_csv(file = 'dat34.csv')
+
+```

@@ -1,0 +1,115 @@
+---
+title: "Laboratorio 01"
+subtitle: "Fecha de entrega: 05/05/2021"
+author: "Grupo 1: Jesús Guzman, Ma del Carmen Carranza, Oscar Agüero, Ricardo Zamora"
+output: 
+  html_document:
+    theme: flatly
+    highlight: tango
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  fig.align = 'center',
+  fig.retina = 2,
+  fig.width = 8,
+  out.width = '100%',
+  fig.asp = 0.63
+  )
+
+```
+
+## Instrucciones generales {.tabset .tabset-fade}
+
+Genere un `R Markdown` en donde se muestre el código utilizado y la salida de este. Utilice los paquetes asociados al `tidyverse` para leer y manipular los datos (`readr`,`tidyr`, `dplyr`, ...), así como el paquete `lubridate` para manipular fechas y algún paquete tipo `readxl` para leer los archivos de Excel.
+
+### Los datos
+
+Se tienen 547 archivos a lo largo de una estructura de carpetas del tipo `.../año/cuenca/estacion/archivo`. Se desea recopilar la información contenida en estos y unificarla en una misma tabla de datos. La información corresponde a [aforos de caudal](https://www.youtube.com/watch?v=BA6HIXVWA7Y) realizados en 10 estaciones hidrológicas, pertenecientes a la red del Instituto Costarricense de Electricidad, a lo largo de un periodo de 5 años.
+
+
+Vamos a trabajar con archivos simplificados donde cada uno de ellos cuenta únicamente con 10 datos a ser recuperados:
+
+* **id** `<int>`> código que identifica a la estación
+* **fecha** `<dttm>`: fecha en la cual se realizó la medición
+* **h** `<dbl>`: escala local
+* **q** `<dbl>`: caudal 
+* **a** `<dbl>`: area 
+* **v** `<dbl>`: velocidad promedio
+* **d** `<dbl>`: profundidad promedio
+* **ph** `<dbl>`: radio hidráulico
+* **w** `<dbl>`: ancho máximo
+* **curva** `<int>`: número de curva
+
+```{r echo=FALSE, out.width='100%', fig.show='hold'}
+#knitr::include_graphics("img/archivo_simplificado.png")
+```
+
+
+### Leer los datos
+
+1. Cargue los paquetes que vaya a utilizar en el análisis.
+
+    ```{r, warning=FALSE,message=FALSE}
+library(DT)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(purrr)
+library(readr)
+library(readxl)
+library(stringr)
+library(lubridate)
+library(data.table)
+library(stringr)
+library(janitor)
+
+```
+
+1. Desarrolle el código necesario para recuperar la información requerida.
+    * *Sugerencia 1:* utilice las funciones del tipo `map_`.
+    * *Sugerencia 2:* revise las funciones del paquete `stringr`.
+    * *Sugerencia 3:* recuerde que los nombres de las variables se mantienen constantes a lo largo de los archivos
+
+    ```{r}
+    # inserte acá su código
+    
+data_frame <- function(a) data.frame(matrix(as.matrix(a),
+               nrow =2,ncol = (dim(data.frame(a))[1]/2),
+               byrow=F )) %>% janitor::row_to_names(row_number = 1,
+               remove_row=T)
+    
+setwd("C:/Users/Ma del Carmen/Desktop/Estadística Computacional/Labo 1/Lab 1/datos")
+l<- list.files(path ="C:/Users/Ma del Carmen/Desktop/Estadística Computacional/Labo 1/Lab 1/datos",
+               recursive = T)
+l <- l[-353] 
+
+
+leyendoDatos<- function(l){
+  if(stringr::str_detect(pattern = ".xlsx", l)){d <- readxl::read_excel(l)}
+  if(stringr::str_detect(pattern = ".csv", l)){d <- readr::read_csv(l)}
+  if(stringr::str_detect(pattern = ".tsv", l)){d <- read.table(l,  header = T ,sep = '\t')}
+  d <- d[!(rowSums(is.na(d))==dim(d)[2]),]
+  d<- apply( d, 1, cbind.data.frame)
+  d <- lapply(d, na.omit)
+  d <- lapply(d, data_frame)
+  d<- do.call(cbind.data.frame, d)
+  d
+}
+l<- purrr::map_df(l,leyendoDatos)
+
+```
+
+
+### Tabla de datos unificada
+
+1. Presente la tabla de datos. Para ello utilice el paquete [`DT`](https://rstudio.github.io/DT/) para crear una entidad interactiva en el documento.
+
+    ```{r}
+    # inserte acá su código
+       DT::datatable(l)
+    
+```
+
