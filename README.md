@@ -1,2 +1,2 @@
-# Computational-statistics - UCR
+# Computational-statistics
 Computational statistics labs - UCR
